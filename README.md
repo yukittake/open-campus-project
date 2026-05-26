@@ -24,7 +24,12 @@
 
 フレームワーク
 
-- PixiJS(https://pixijs.com/8.x/guides/getting-started/quick-start)
+- PixiJS(https://pixijs.com/8.x/guides/getting-started/quick-start)  
+キャッチアップ方法
+1. https://pixijs.com/8.x/guides/getting-started/quick-start でローカル実行をつかむ
+2. https://pixijs.com/8.x/tutorials を一通り
+3. https://pixijs.com/8.x/examples を気になるところだけ
+4. https://pixijs.com/8.x/guides/concepts/architecture のCore Conceptsを一通り読み、核を知る
 
 ### ほかの選択肢
 - JS
