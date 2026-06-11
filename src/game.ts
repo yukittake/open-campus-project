@@ -1,9 +1,10 @@
-import { Application, Container, Graphics, Rectangle, Text } from 'pixi.js';
+import { Application, Assets, Container, Graphics, Rectangle, Sprite, Text, Texture } from 'pixi.js';
 import { CAPACITY, ROUND_SECONDS, WORLD_HEIGHT, WORLD_WIDTH } from './constants';
 import { drawBag, drawIcon } from './drawing';
 import { items } from './items';
 import { money, rankFor } from './scoring';
 import type { Item, Scene } from './types';
+import titleImageUrl from '../images/title_chatgpt.png';
 
 export class KnapsackThiefGame {
   private readonly app = new Application();
@@ -16,6 +17,7 @@ export class KnapsackThiefGame {
   private message = '';
   private messageUntil = 0;
   private currentScale = 1;
+  private titleTexture: Texture | null = null;
 
   async start(root: HTMLDivElement) {
     await this.app.init({
@@ -29,6 +31,8 @@ export class KnapsackThiefGame {
 
     root.appendChild(this.app.canvas);
     this.app.stage.addChild(this.world);
+    this.drawBackdrop();
+    this.titleTexture = await Assets.load<Texture>(titleImageUrl);
 
     window.addEventListener('resize', () => {
       this.resize();
@@ -155,12 +159,24 @@ export class KnapsackThiefGame {
   private drawTitle() {
     this.scene = 'TITLE';
     this.clearWorld();
-    this.drawBackdrop();
-    this.addText('ナップサック・シーフ', 400, 145, 52, 0xffd56b, 'bold');
-    this.addText('制限時間内に、もっとも価値の高い宝を盗み出そう。', 400, 215, 22, 0xd7e4df);
-    this.addText('容量: 50.0 kg   制限時間: 60秒', 400, 252, 20, 0x9ec6bc);
-    this.drawTreasurePile(400, 350, 1.35);
-    this.makeButton('ゲーム開始', 400, 505, 210, 58, () => this.startGame(), 0xb93431);
+    if (!this.titleTexture) {
+      this.drawBackdrop();
+      return;
+    }
+
+    const title = new Sprite(this.titleTexture);
+    title.width = WORLD_WIDTH;
+    title.height = WORLD_HEIGHT;
+    this.world.addChild(title);
+
+    const button = new Container();
+    button.position.set(400, 509);
+    button.eventMode = 'static';
+    button.cursor = 'pointer';
+    button.hitArea = new Rectangle(-158, -46, 316, 92);
+
+    button.on('pointerdown', () => this.startGame());
+    this.world.addChild(button);
   }
 
   private drawGame() {
