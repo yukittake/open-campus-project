@@ -4,7 +4,19 @@ import { drawBag, drawIcon } from './drawing';
 import { items } from './items';
 import { money, rankFor } from './scoring';
 import type { Item, Scene } from './types';
+import gameBackgroundUrl from '../images/game/background.png';
 import titleImageUrl from '../images/title_chatgpt.png';
+
+const itemImageUrls = import.meta.glob('../images/game/items/item_*.png', {
+  eager: true,
+  query: '?url',
+  import: 'default',
+}) as Record<string, string>;
+
+const ITEM_CARD_WIDTH = 78;
+const ITEM_CARD_HEIGHT = 110;
+const ITEM_CARD_COL_GAP = 78;
+const ITEM_CARD_ROW_GAP = 108;
 
 export class KnapsackThiefGame {
   private readonly app = new Application();
@@ -17,7 +29,9 @@ export class KnapsackThiefGame {
   private message = '';
   private messageUntil = 0;
   private currentScale = 1;
+  private gameBackgroundTexture: Texture | null = null;
   private titleTexture: Texture | null = null;
+  private itemTextures = new Map<number, Texture>();
 
   async start(root: HTMLDivElement) {
     await this.app.init({
@@ -32,7 +46,11 @@ export class KnapsackThiefGame {
     root.appendChild(this.app.canvas);
     this.app.stage.addChild(this.world);
     this.drawBackdrop();
-    this.titleTexture = await Assets.load<Texture>(titleImageUrl);
+    [this.gameBackgroundTexture, this.titleTexture] = await Promise.all([
+      Assets.load<Texture>(gameBackgroundUrl),
+      Assets.load<Texture>(titleImageUrl),
+    ]);
+    await this.loadItemTextures();
 
     window.addEventListener('resize', () => {
       this.resize();
@@ -98,6 +116,33 @@ export class KnapsackThiefGame {
 
   private clearWorld() {
     this.world.removeChildren();
+  }
+
+  private async loadItemTextures() {
+    await Promise.all(
+      Object.entries(itemImageUrls).map(async ([path, url]) => {
+        const match = path.match(/item_(\d+)\.png$/);
+        if (!match) return;
+
+        const texture = await Assets.load<Texture>(url);
+        this.itemTextures.set(Number(match[1]), texture);
+      }),
+    );
+  }
+
+  private drawItemImage(parent: Container, item: Item, x: number, y: number, width: number, height: number) {
+    const texture = this.itemTextures.get(item.id);
+    if (!texture) {
+      drawIcon(parent, item, x, y, 0.82);
+      return;
+    }
+
+    const image = new Sprite(texture);
+    image.anchor.set(0.5);
+    image.position.set(x, y);
+    image.width = width;
+    image.height = height;
+    parent.addChild(image);
   }
 
   private addText(text: string, x: number, y: number, size: number, color = 0xffffff, weight: 'normal' | 'bold' = 'normal') {
@@ -181,15 +226,14 @@ export class KnapsackThiefGame {
 
   private drawGame() {
     this.clearWorld();
-    this.drawBackdrop();
-
-    const shelf = new Graphics();
-    shelf.roundRect(28, 102, 490, 390, 6).fill(0x2d2118);
-    shelf.roundRect(44, 118, 458, 358, 4).fill(0x43301f);
-    for (let i = 0; i < 3; i += 1) {
-      shelf.rect(50, 202 + i * 91, 446, 10).fill(0x24180f);
+    if (this.gameBackgroundTexture) {
+      const background = new Sprite(this.gameBackgroundTexture);
+      background.width = WORLD_WIDTH;
+      background.height = WORLD_HEIGHT;
+      this.world.addChild(background);
+    } else {
+      this.drawBackdrop();
     }
-    this.world.addChild(shelf);
 
     this.addText('宝物庫', 273, 68, 30, 0xffd56b, 'bold');
     this.addText(`残り ${Math.ceil(this.timeLeft)}秒`, 650, 70, 32, this.timeLeft <= 10 ? 0xff746b : 0xffd56b, 'bold');
@@ -212,22 +256,31 @@ export class KnapsackThiefGame {
     const hover = this.hoveredItem?.id === item.id;
     const card = new Container();
 
-    card.position.set(75 + col * 88, 153 + row * 91);
+    card.position.set(75 + col * ITEM_CARD_COL_GAP, 153 + row * ITEM_CARD_ROW_GAP);
     card.eventMode = 'static';
     card.cursor = 'pointer';
-    card.hitArea = new Rectangle(-32, -29, 64, 58);
+    card.hitArea = new Rectangle(-ITEM_CARD_WIDTH / 2, -ITEM_CARD_HEIGHT / 2, ITEM_CARD_WIDTH, ITEM_CARD_HEIGHT);
 
-    const bg = new Graphics();
-    bg.roundRect(-32, -29, 64, 58, 6).fill(active ? 0x264d3e : 0x1b2324);
-    bg.roundRect(-32, -29, 64, 58, 6).stroke({ color: hover ? 0xffe08a : active ? 0x67d19b : 0x516064, width: hover ? 3 : 2 });
-    card.addChild(bg);
+    this.drawItemImage(card, item, 0, 0, ITEM_CARD_WIDTH, ITEM_CARD_HEIGHT);
 
-    drawIcon(card, item, 0, -2, 0.82);
+    if (hover || active) {
+      const outline = new Graphics();
+      outline
+        .roundRect(-ITEM_CARD_WIDTH / 2, -ITEM_CARD_HEIGHT / 2, ITEM_CARD_WIDTH, ITEM_CARD_HEIGHT, 3)
+        .stroke({ color: hover ? 0xffe08a : 0x67d19b, width: hover ? 3 : 2 });
+      card.addChild(outline);
+    }
 
     if (active) {
       const check = new Graphics();
-      check.circle(24, -22, 9).fill(0x67d19b);
-      check.moveTo(19, -22).lineTo(23, -18).lineTo(30, -27).stroke({ color: 0x102015, width: 2.5 });
+      const checkX = ITEM_CARD_WIDTH / 2 - 8;
+      const checkY = -ITEM_CARD_HEIGHT / 2 + 8;
+      check.circle(checkX, checkY, 9).fill(0x67d19b);
+      check
+        .moveTo(checkX - 5, checkY)
+        .lineTo(checkX - 1, checkY + 4)
+        .lineTo(checkX + 6, checkY - 5)
+        .stroke({ color: 0x102015, width: 2.5 });
       card.addChild(check);
     }
 
@@ -355,7 +408,7 @@ export class KnapsackThiefGame {
     [items[2], items[5], items[10], items[13], items[14]].forEach((item, index) => {
       const icon = new Container();
       icon.position.set((index - 2) * 45, Math.abs(index - 2) * 12);
-      drawIcon(icon, item, 0, 0, 1);
+      this.drawItemImage(icon, item, 0, 0, 36, 51);
       pile.addChild(icon);
     });
   }
