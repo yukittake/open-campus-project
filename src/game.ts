@@ -1,4 +1,4 @@
-import { Application, Assets, Container, Graphics, Rectangle, Sprite, Text, Texture } from 'pixi.js';
+import { Application, Assets, BlurFilter, Container, Graphics, Rectangle, Sprite, Text, Texture } from 'pixi.js';
 import { CAPACITY, ROUND_SECONDS, WORLD_HEIGHT, WORLD_WIDTH } from './constants';
 import { drawBag, drawIcon } from './drawing';
 import { items } from './items';
@@ -18,6 +18,9 @@ export class KnapsackThiefGame {
   private messageUntil = 0;
   private currentScale = 1;
   private titleTexture: Texture | null = null;
+  private titleSparkles: any[] = [];
+  private sharpContainer: Container | null = null;
+  private glowContainer: Container | null = null;
 
   async start(root: HTMLDivElement) {
     await this.app.init({
@@ -75,6 +78,10 @@ export class KnapsackThiefGame {
   }
 
   private tick() {
+    if (this.scene === 'TITLE') {
+      this.updateTitleEffects();
+      return;
+    }
     if (this.scene !== 'PLAYING') return;
 
     const now = performance.now();
@@ -97,6 +104,15 @@ export class KnapsackThiefGame {
   }
 
   private clearWorld() {
+    if (this.titleSparkles && this.titleSparkles.length > 0) {
+      this.titleSparkles.forEach((sp) => {
+        sp.sharpGfx.destroy();
+        sp.glowGfx.destroy();
+      });
+      this.titleSparkles = [];
+    }
+    this.sharpContainer = null;
+    this.glowContainer = null;
     this.world.removeChildren();
   }
 
@@ -168,6 +184,8 @@ export class KnapsackThiefGame {
     title.width = WORLD_WIDTH;
     title.height = WORLD_HEIGHT;
     this.world.addChild(title);
+
+    this.initTitleEffects();
 
     const button = new Container();
     button.position.set(400, 509);
@@ -358,5 +376,121 @@ export class KnapsackThiefGame {
       drawIcon(icon, item, 0, 0, 1);
       pile.addChild(icon);
     });
+  }
+
+  private initTitleEffects() {
+    this.titleSparkles = [];
+
+    this.glowContainer = new Container();
+    const blur = new BlurFilter({ strength: 5, quality: 3 });
+    this.glowContainer.filters = [blur];
+    this.glowContainer.blendMode = 'add';
+    this.world.addChild(this.glowContainer);
+
+    this.sharpContainer = new Container();
+    this.world.addChild(this.sharpContainer);
+
+    for (let i = 0; i < 12; i += 1) {
+      this.spawnTitleSparkle(true);
+    }
+  }
+
+  private spawnTitleSparkle(randomizeAge = false) {
+    // Treasures are in the bottom-right: roughly X: 540 to 760, Y: 400 to 560
+    const x = 540 + Math.random() * 210;
+    const y = 400 + Math.random() * 140;
+
+    const sharpGfx = new Graphics();
+    const glowGfx = new Graphics();
+
+    const type = Math.floor(Math.random() * 2);
+    const color = [0xffffff, 0xffd56b, 0xffea85, 0xfff3cc][Math.floor(Math.random() * 4)];
+
+    if (type === 0) {
+      // 4-pointed star
+      sharpGfx.star(0, 0, 4, 8, 2).fill(color);
+      glowGfx.star(0, 0, 4, 10, 3).fill(color);
+    } else {
+      // Soft circle
+      sharpGfx.circle(0, 0, 3.5).fill(color);
+      glowGfx.circle(0, 0, 5.5).fill(color);
+    }
+
+    sharpGfx.position.set(x, y);
+    glowGfx.position.set(x, y);
+
+    sharpGfx.alpha = 0;
+    glowGfx.alpha = 0;
+
+    const scale = 0.35 + Math.random() * 0.45;
+    sharpGfx.scale.set(scale);
+    glowGfx.scale.set(scale);
+
+    this.sharpContainer?.addChild(sharpGfx);
+    this.glowContainer?.addChild(glowGfx);
+
+    const maxLife = 60 + Math.random() * 80;
+    const currentLife = randomizeAge ? Math.floor(Math.random() * maxLife) : 0;
+
+    const vx = (Math.random() - 0.5) * 0.15;
+    const vy = (Math.random() - 0.5) * 0.15 - 0.08; // float upwards slower
+
+    this.titleSparkles.push({
+      sharpGfx,
+      glowGfx,
+      x,
+      y,
+      vx,
+      vy,
+      scale,
+      life: currentLife,
+      maxLife,
+      rotSpeed: (Math.random() - 0.5) * 0.03,
+    });
+  }
+
+  private updateTitleEffects() {
+    if (!this.sharpContainer || !this.glowContainer) return;
+
+    for (let i = this.titleSparkles.length - 1; i >= 0; i -= 1) {
+      const sp = this.titleSparkles[i];
+      sp.life += 1;
+
+      if (sp.life >= sp.maxLife) {
+        this.sharpContainer.removeChild(sp.sharpGfx);
+        this.glowContainer.removeChild(sp.glowGfx);
+        sp.sharpGfx.destroy();
+        sp.glowGfx.destroy();
+        this.titleSparkles.splice(i, 1);
+        this.spawnTitleSparkle(false);
+        continue;
+      }
+
+      sp.x += sp.vx;
+      sp.y += sp.vy;
+      sp.sharpGfx.position.set(sp.x, sp.y);
+      sp.glowGfx.position.set(sp.x, sp.y);
+
+      sp.sharpGfx.rotation += sp.rotSpeed;
+      sp.glowGfx.rotation += sp.rotSpeed;
+
+      const progress = sp.life / sp.maxLife;
+      let alpha = 0;
+      if (progress < 0.2) {
+        alpha = progress / 0.2;
+      } else if (progress > 0.8) {
+        alpha = (1.0 - progress) / 0.2;
+      } else {
+        alpha = 1.0;
+      }
+
+      const shimmer = 0.9 + Math.random() * 0.1;
+      sp.sharpGfx.alpha = alpha * 0.5 * shimmer;
+      sp.glowGfx.alpha = alpha * 0.2 * shimmer;
+
+      const currentScale = sp.scale * (0.8 + Math.sin(progress * Math.PI) * 0.3);
+      sp.sharpGfx.scale.set(currentScale);
+      sp.glowGfx.scale.set(currentScale * 1.2);
+    }
   }
 }
