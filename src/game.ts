@@ -4,7 +4,19 @@ import { drawBag, drawIcon } from './drawing';
 import { items } from './items';
 import { money, rankFor } from './scoring';
 import type { Item, Scene } from './types';
-import titleImageUrl from '../images/title_chatgpt.png';
+import gameBackgroundUrl from '../images/in-game/background.png';
+import titleImageUrl from '../images/in-game/title_chatgpt.png';
+
+const itemImageUrls = import.meta.glob('../images/in-game/items/item_*.png', {
+  eager: true,
+  query: '?url',
+  import: 'default',
+}) as Record<string, string>;
+
+const ITEM_CARD_WIDTH = 78;
+const ITEM_CARD_HEIGHT = 110;
+const ITEM_CARD_COL_GAP = 78;
+const ITEM_CARD_ROW_GAP = 108;
 
 export class KnapsackThiefGame {
   private readonly app = new Application();
@@ -17,10 +29,17 @@ export class KnapsackThiefGame {
   private message = '';
   private messageUntil = 0;
   private currentScale = 1;
+  private gameBackgroundTexture: Texture | null = null;
   private titleTexture: Texture | null = null;
+  private itemTextures = new Map<number, Texture>();
   private titleSparkles: any[] = [];
   private sharpContainer: Container | null = null;
   private glowContainer: Container | null = null;
+  private gameStaticLayer: Container | null = null;
+  private itemLayer: Container | null = null;
+  private statusLayer: Container | null = null;
+  private overlayLayer: Container | null = null;
+  private timerText: Text | null = null;
 
   async start(root: HTMLDivElement) {
     await this.app.init({
@@ -35,7 +54,11 @@ export class KnapsackThiefGame {
     root.appendChild(this.app.canvas);
     this.app.stage.addChild(this.world);
     this.drawBackdrop();
-    this.titleTexture = await Assets.load<Texture>(titleImageUrl);
+    [this.gameBackgroundTexture, this.titleTexture] = await Promise.all([
+      Assets.load<Texture>(gameBackgroundUrl),
+      Assets.load<Texture>(titleImageUrl),
+    ]);
+    await this.loadItemTextures();
 
     window.addEventListener('resize', () => {
       this.resize();
@@ -94,12 +117,13 @@ export class KnapsackThiefGame {
       return;
     }
 
-    this.drawGame();
+    this.updateGameTimer();
+    this.redrawOverlayLayer();
   }
 
   private redrawScene() {
     if (this.scene === 'TITLE') this.drawTitle();
-    if (this.scene === 'PLAYING') this.drawGame();
+    if (this.scene === 'PLAYING') this.drawGameScene();
     if (this.scene === 'RESULTS') this.drawResults();
   }
 
@@ -113,10 +137,50 @@ export class KnapsackThiefGame {
     }
     this.sharpContainer = null;
     this.glowContainer = null;
+    this.gameStaticLayer = null;
+    this.itemLayer = null;
+    this.statusLayer = null;
+    this.overlayLayer = null;
+    this.timerText = null;
     this.world.removeChildren();
   }
 
-  private addText(text: string, x: number, y: number, size: number, color = 0xffffff, weight: 'normal' | 'bold' = 'normal') {
+  private async loadItemTextures() {
+    await Promise.all(
+      Object.entries(itemImageUrls).map(async ([path, url]) => {
+        const match = path.match(/item_(\d+)\.png$/);
+        if (!match) return;
+
+        const texture = await Assets.load<Texture>(url);
+        this.itemTextures.set(Number(match[1]), texture);
+      }),
+    );
+  }
+
+  private drawItemImage(parent: Container, item: Item, x: number, y: number, width: number, height: number) {
+    const texture = this.itemTextures.get(item.id);
+    if (!texture) {
+      drawIcon(parent, item, x, y, 0.82);
+      return;
+    }
+
+    const image = new Sprite(texture);
+    image.anchor.set(0.5);
+    image.position.set(x, y);
+    image.width = width;
+    image.height = height;
+    parent.addChild(image);
+  }
+
+  private addText(
+    text: string,
+    x: number,
+    y: number,
+    size: number,
+    color = 0xffffff,
+    weight: 'normal' | 'bold' = 'normal',
+    parent: Container = this.world,
+  ) {
     const label = new Text({
       text,
       resolution: this.textResolution(),
@@ -130,11 +194,20 @@ export class KnapsackThiefGame {
     });
     label.anchor.set(0.5);
     label.position.set(x, y);
-    this.world.addChild(label);
+    parent.addChild(label);
     return label;
   }
 
-  private makeButton(label: string, x: number, y: number, width: number, height: number, onClick: () => void, color = 0xbd2f35) {
+  private makeButton(
+    label: string,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    onClick: () => void,
+    color = 0xbd2f35,
+    parent: Container = this.world,
+  ) {
     const button = new Container();
     button.position.set(x, y);
     button.eventMode = 'static';
@@ -161,15 +234,15 @@ export class KnapsackThiefGame {
     button.on('pointerover', () => draw(0xd9433d));
     button.on('pointerout', () => draw(color));
     button.on('pointerdown', onClick);
-    this.world.addChild(button);
+    parent.addChild(button);
   }
 
-  private drawBackdrop() {
+  private drawBackdrop(parent: Container = this.world) {
     const bg = new Graphics();
     bg.rect(0, 0, WORLD_WIDTH, WORLD_HEIGHT).fill(0x111719);
     bg.rect(0, 0, WORLD_WIDTH, 88).fill(0x1e2d2d);
     bg.rect(0, 520, WORLD_WIDTH, 80).fill(0x151b1d);
-    this.world.addChild(bg);
+    parent.addChild(bg);
   }
 
   private drawTitle() {
@@ -197,84 +270,162 @@ export class KnapsackThiefGame {
     this.world.addChild(button);
   }
 
-  private drawGame() {
+  private drawGameScene() {
     this.clearWorld();
-    this.drawBackdrop();
+    this.gameStaticLayer = new Container();
+    this.itemLayer = new Container();
+    this.statusLayer = new Container();
+    this.overlayLayer = new Container();
+    this.world.addChild(this.gameStaticLayer, this.itemLayer, this.statusLayer, this.overlayLayer);
 
-    const shelf = new Graphics();
-    shelf.roundRect(28, 102, 490, 390, 6).fill(0x2d2118);
-    shelf.roundRect(44, 118, 458, 358, 4).fill(0x43301f);
-    for (let i = 0; i < 3; i += 1) {
-      shelf.rect(50, 202 + i * 91, 446, 10).fill(0x24180f);
+    this.drawGameBackground();
+    this.drawGameHeader();
+    this.drawItemGrid();
+    this.redrawStatusPanel();
+    this.redrawOverlayLayer();
+  }
+
+  private drawGameBackground() {
+    if (this.gameBackgroundTexture) {
+      const background = new Sprite(this.gameBackgroundTexture);
+      background.width = WORLD_WIDTH;
+      background.height = WORLD_HEIGHT;
+      this.gameStaticLayer?.addChild(background);
+      return;
     }
-    this.world.addChild(shelf);
 
-    this.addText('宝物庫', 273, 68, 30, 0xffd56b, 'bold');
-    this.addText(`残り ${Math.ceil(this.timeLeft)}秒`, 650, 70, 32, this.timeLeft <= 10 ? 0xff746b : 0xffd56b, 'bold');
+    this.drawBackdrop(this.gameStaticLayer ?? this.world);
+  }
 
+  private drawGameHeader() {
+    this.addText('宝物庫', 273, 68, 30, 0xffd56b, 'bold', this.gameStaticLayer ?? this.world);
+    this.timerText = this.addText(
+      `残り ${Math.ceil(this.timeLeft)}秒`,
+      650,
+      70,
+      32,
+      this.timeLeft <= 10 ? 0xff746b : 0xffd56b,
+      'bold',
+      this.gameStaticLayer ?? this.world,
+    );
+  }
+
+  private updateGameTimer() {
+    if (!this.timerText) return;
+
+    this.timerText.text = `残り ${Math.ceil(this.timeLeft)}秒`;
+    this.timerText.style.fill = this.timeLeft <= 10 ? 0xff746b : 0xffd56b;
+  }
+
+  private drawItemGrid() {
+    this.itemLayer?.removeChildren();
     items.forEach((item, index) => this.drawItemCard(item, index));
-    this.drawStatusPanel();
+  }
 
-    if (this.message && performance.now() < this.messageUntil) {
-      const toast = new Graphics();
-      toast.roundRect(250, 512, 300, 38, 7).fill({ color: 0x681f28, alpha: 0.94 });
-      this.world.addChild(toast);
-      this.addText(this.message, 400, 531, 17, 0xffffff, 'bold');
-    }
+  private redrawStatusPanel() {
+    this.statusLayer?.removeChildren();
+    this.drawStatusPanel();
+  }
+
+  private redrawOverlayLayer() {
+    this.overlayLayer?.removeChildren();
+    this.drawToast();
+    this.drawHoveredItemFrame();
+  }
+
+  private drawToast() {
+    if (!this.message || performance.now() >= this.messageUntil) return;
+
+    const toast = new Graphics();
+    toast.roundRect(250, 512, 300, 38, 7).fill({ color: 0x681f28, alpha: 0.94 });
+    this.overlayLayer?.addChild(toast);
+    this.addText(this.message, 400, 531, 17, 0xffffff, 'bold', this.overlayLayer ?? this.world);
   }
 
   private drawItemCard(item: Item, index: number) {
     const col = index % 5;
     const row = Math.floor(index / 5);
     const active = this.selected.has(item.id);
-    const hover = this.hoveredItem?.id === item.id;
     const card = new Container();
 
-    card.position.set(75 + col * 88, 153 + row * 91);
+    card.position.set(75 + col * ITEM_CARD_COL_GAP, 153 + row * ITEM_CARD_ROW_GAP);
     card.eventMode = 'static';
     card.cursor = 'pointer';
-    card.hitArea = new Rectangle(-32, -29, 64, 58);
+    card.hitArea = new Rectangle(-ITEM_CARD_WIDTH / 2, -ITEM_CARD_HEIGHT / 2, ITEM_CARD_WIDTH, ITEM_CARD_HEIGHT);
 
-    const bg = new Graphics();
-    bg.roundRect(-32, -29, 64, 58, 6).fill(active ? 0x264d3e : 0x1b2324);
-    bg.roundRect(-32, -29, 64, 58, 6).stroke({ color: hover ? 0xffe08a : active ? 0x67d19b : 0x516064, width: hover ? 3 : 2 });
-    card.addChild(bg);
+    this.drawItemImage(card, item, 0, 0, ITEM_CARD_WIDTH, ITEM_CARD_HEIGHT);
 
-    drawIcon(card, item, 0, -2, 0.82);
+    if (active) {
+      const outline = new Graphics();
+      outline
+        .roundRect(-ITEM_CARD_WIDTH / 2, -ITEM_CARD_HEIGHT / 2, ITEM_CARD_WIDTH, ITEM_CARD_HEIGHT, 3)
+        .stroke({ color: 0x67d19b, width: 2 });
+      card.addChild(outline);
+    }
 
     if (active) {
       const check = new Graphics();
-      check.circle(24, -22, 9).fill(0x67d19b);
-      check.moveTo(19, -22).lineTo(23, -18).lineTo(30, -27).stroke({ color: 0x102015, width: 2.5 });
+      const checkX = ITEM_CARD_WIDTH / 2 - 8;
+      const checkY = -ITEM_CARD_HEIGHT / 2 + 8;
+      check.circle(checkX, checkY, 9).fill(0x67d19b);
+      check
+        .moveTo(checkX - 5, checkY)
+        .lineTo(checkX - 1, checkY + 4)
+        .lineTo(checkX + 6, checkY - 5)
+        .stroke({ color: 0x102015, width: 2.5 });
       card.addChild(check);
     }
 
     card.on('pointerover', () => {
       this.hoveredItem = item;
-      this.drawGame();
+      this.redrawStatusPanel();
+      this.redrawOverlayLayer();
     });
     card.on('pointerout', () => {
       this.hoveredItem = null;
-      this.drawGame();
+      this.redrawStatusPanel();
+      this.redrawOverlayLayer();
     });
     card.on('pointerdown', () => this.toggleItem(item));
-    this.world.addChild(card);
+    this.itemLayer?.addChild(card);
+  }
+
+  private drawHoveredItemFrame() {
+    if (!this.hoveredItem) return;
+
+    const index = items.findIndex((item) => item.id === this.hoveredItem?.id);
+    if (index < 0) return;
+
+    const col = index % 5;
+    const row = Math.floor(index / 5);
+    const frame = new Graphics();
+    frame
+      .roundRect(
+        75 + col * ITEM_CARD_COL_GAP - ITEM_CARD_WIDTH / 2,
+        153 + row * ITEM_CARD_ROW_GAP - ITEM_CARD_HEIGHT / 2,
+        ITEM_CARD_WIDTH,
+        ITEM_CARD_HEIGHT,
+        3,
+      )
+      .stroke({ color: 0xffe08a, width: 3 });
+    this.overlayLayer?.addChild(frame);
   }
 
   private drawStatusPanel() {
+    const parent = this.statusLayer ?? this.world;
     const panel = new Graphics();
     panel.roundRect(542, 104, 226, 388, 6).fill(0x20282a);
     panel.roundRect(542, 104, 226, 388, 6).stroke({ color: 0x486065, width: 2 });
-    this.world.addChild(panel);
+    parent.addChild(panel);
 
-    this.addText('バッグ', 655, 132, 26, 0xffd56b, 'bold');
-    drawBag(this.world, 655, 218, 1.35);
+    this.addText('バッグ', 655, 132, 26, 0xffd56b, 'bold', parent);
+    drawBag(parent, 655, 218, 1.35);
 
     const weight = this.totalWeight();
     const value = this.totalValue();
-    this.addText(`${weight.toFixed(1)} kg / ${CAPACITY.toFixed(1)} kg`, 655, 304, 20, weight > 47 ? 0xffd56b : 0xd7e4df, 'bold');
-    this.drawGauge(570, 326, 170, 18, weight / CAPACITY);
-    this.addText(money.format(value), 655, 377, 34, 0x82e2a5, 'bold');
+    this.addText(`${weight.toFixed(1)} kg / ${CAPACITY.toFixed(1)} kg`, 655, 304, 20, weight > 47 ? 0xffd56b : 0xd7e4df, 'bold', parent);
+    this.drawGauge(570, 326, 170, 18, weight / CAPACITY, parent);
+    this.addText(money.format(value), 655, 377, 34, 0x82e2a5, 'bold', parent);
 
     const info = this.hoveredItem
       ? `${this.hoveredItem.name}\n${this.hoveredItem.weight.toFixed(1)} kg  ${money.format(this.hoveredItem.value)}`
@@ -289,36 +440,42 @@ export class KnapsackThiefGame {
     });
     hint.anchor.set(0.5);
     hint.position.set(655, 421);
-    this.world.addChild(hint);
+    parent.addChild(hint);
 
-    this.makeButton('脱出する', 655, 465, 150, 44, () => this.finishGame(), 0xb93431);
+    this.makeButton('脱出する', 655, 465, 150, 44, () => this.finishGame(), 0xb93431, parent);
   }
 
-  private drawGauge(x: number, y: number, width: number, height: number, ratio: number) {
+  private drawGauge(x: number, y: number, width: number, height: number, ratio: number, parent: Container = this.world) {
     const gauge = new Graphics();
     const clamped = Math.min(1, Math.max(0, ratio));
     gauge.roundRect(x, y, width, height, 6).fill(0x111719);
     gauge.roundRect(x, y, width * clamped, height, 6).fill(ratio > 0.9 ? 0xe0b849 : 0x64c58f);
     gauge.roundRect(x, y, width, height, 6).stroke({ color: 0x526469, width: 2 });
-    this.world.addChild(gauge);
+    parent.addChild(gauge);
   }
 
   private toggleItem(item: Item) {
     if (this.selected.has(item.id)) {
       this.selected.delete(item.id);
-      this.drawGame();
+      this.redrawSelectionState();
       return;
     }
 
     if (this.totalWeight() + item.weight > CAPACITY) {
       this.message = 'バッグの容量を超えています！';
       this.messageUntil = performance.now() + 1200;
-      this.drawGame();
+      this.redrawOverlayLayer();
       return;
     }
 
     this.selected.add(item.id);
-    this.drawGame();
+    this.redrawSelectionState();
+  }
+
+  private redrawSelectionState() {
+    this.drawItemGrid();
+    this.redrawStatusPanel();
+    this.redrawOverlayLayer();
   }
 
   private startGame() {
@@ -328,7 +485,7 @@ export class KnapsackThiefGame {
     this.hoveredItem = null;
     this.message = '';
     this.scene = 'PLAYING';
-    this.drawGame();
+    this.drawGameScene();
   }
 
   private finishGame() {
@@ -373,7 +530,7 @@ export class KnapsackThiefGame {
     [items[2], items[5], items[10], items[13], items[14]].forEach((item, index) => {
       const icon = new Container();
       icon.position.set((index - 2) * 45, Math.abs(index - 2) * 12);
-      drawIcon(icon, item, 0, 0, 1);
+      this.drawItemImage(icon, item, 0, 0, 36, 51);
       pile.addChild(icon);
     });
   }
