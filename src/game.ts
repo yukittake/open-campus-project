@@ -1,10 +1,10 @@
 import { Application, Container, Rectangle } from 'pixi.js';
 import { WORLD_HEIGHT, WORLD_WIDTH } from './constants';
 import { loadGameAssets, type GameAssets } from './gameAssets';
-import { drawBackdrop } from './pixiHelpers';
-import { PlayScene } from './scenes/PlayScene';
-import { ResultsScene } from './scenes/ResultsScene';
-import { TitleScene } from './scenes/TitleScene';
+import { drawBackdrop } from './backdrop';
+import { PlayScene } from './scenes/play/PlayScene';
+import { ResultsScene } from './scenes/results/ResultsScene';
+import { TitleScene } from './scenes/title/TitleScene';
 
 type GameScene = Container & {
   update?: () => void;

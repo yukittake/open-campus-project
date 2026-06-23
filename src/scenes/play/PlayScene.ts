@@ -1,10 +1,12 @@
 import { Container, Graphics, Rectangle, Sprite, Text, Texture } from 'pixi.js';
-import { CAPACITY, ROUND_SECONDS, WORLD_HEIGHT, WORLD_WIDTH } from '../constants';
-import { drawBag } from '../drawing';
-import { items } from '../items';
-import { addText, drawBackdrop, drawGauge, drawItemImage, makeButton, type TextResolutionProvider } from '../pixiHelpers';
-import { money } from '../scoring';
-import type { Item } from '../types';
+import { CAPACITY, ROUND_SECONDS, WORLD_HEIGHT, WORLD_WIDTH, items, money } from '../../constants';
+import { drawBackdrop } from '../../backdrop';
+import type { Item } from '../../types';
+import { makeButton } from '../../button';
+import { addText, type TextResolutionProvider } from '../../text';
+import { drawBag } from './drawBag';
+import { drawGauge } from './drawGauge';
+import { drawItemImage } from './drawItemImage';
 
 const ITEM_CARD_WIDTH = 78;
 const ITEM_CARD_HEIGHT = 110;
