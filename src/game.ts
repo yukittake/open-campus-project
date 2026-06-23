@@ -265,6 +265,8 @@ export class KnapsackThiefGame {
       this.world.addChild(toast);
       this.addText(this.message, 400, 531, 17, 0xffffff, 'bold');
     }
+
+    this.drawHoveredItemFrame();
   }
 
   private drawItemCard(item: Item, index: number) {
@@ -281,11 +283,11 @@ export class KnapsackThiefGame {
 
     this.drawItemImage(card, item, 0, 0, ITEM_CARD_WIDTH, ITEM_CARD_HEIGHT);
 
-    if (hover || active) {
+    if (active) {
       const outline = new Graphics();
       outline
         .roundRect(-ITEM_CARD_WIDTH / 2, -ITEM_CARD_HEIGHT / 2, ITEM_CARD_WIDTH, ITEM_CARD_HEIGHT, 3)
-        .stroke({ color: hover ? 0xffe08a : 0x67d19b, width: hover ? 3 : 2 });
+        .stroke({ color: 0x67d19b, width: 2 });
       card.addChild(outline);
     }
 
@@ -312,6 +314,27 @@ export class KnapsackThiefGame {
     });
     card.on('pointerdown', () => this.toggleItem(item));
     this.world.addChild(card);
+  }
+
+  private drawHoveredItemFrame() {
+    if (!this.hoveredItem) return;
+
+    const index = items.findIndex((item) => item.id === this.hoveredItem?.id);
+    if (index < 0) return;
+
+    const col = index % 5;
+    const row = Math.floor(index / 5);
+    const frame = new Graphics();
+    frame
+      .roundRect(
+        75 + col * ITEM_CARD_COL_GAP - ITEM_CARD_WIDTH / 2,
+        153 + row * ITEM_CARD_ROW_GAP - ITEM_CARD_HEIGHT / 2,
+        ITEM_CARD_WIDTH,
+        ITEM_CARD_HEIGHT,
+        3,
+      )
+      .stroke({ color: 0xffe08a, width: 3 });
+    this.world.addChild(frame);
   }
 
   private drawStatusPanel() {
