@@ -4,10 +4,10 @@ import { drawBag, drawIcon } from './drawing';
 import { items } from './items';
 import { money, rankFor } from './scoring';
 import type { Item, Scene } from './types';
-import gameBackgroundUrl from '../images/game/background.png';
-import titleImageUrl from '../images/title_chatgpt.png';
+import gameBackgroundUrl from '../images/in-game/background.png';
+import titleImageUrl from '../images/in-game/title_chatgpt.png';
 
-const itemImageUrls = import.meta.glob('../images/game/items/item_*.png', {
+const itemImageUrls = import.meta.glob('../images/in-game/items/item_*.png', {
   eager: true,
   query: '?url',
   import: 'default',
