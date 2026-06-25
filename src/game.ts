@@ -94,8 +94,12 @@ export class KnapsackThiefGame {
   }
 
   private showResults(selected: Set<number>) {
+    if (!this.assets) return;
+
     this.setScene(
       new ResultsScene({
+        backgroundTexture: this.assets.resultBackgroundTexture,
+        itemTextures: this.assets.itemTextures,
         selected,
         textResolution: () => this.textResolution(),
         onBackToTitle: () => this.showTitle(),

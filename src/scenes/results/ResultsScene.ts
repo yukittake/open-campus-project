@@ -1,10 +1,17 @@
-import { Container, Rectangle, Text } from 'pixi.js';
+import { Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js';
 import { CAPACITY, WORLD_HEIGHT, WORLD_WIDTH, items, money } from '../../constants';
-import { drawBackdrop } from '../../utils/backdrop';
-import { makeButton } from '../../utils/button';
 import { addText, type TextResolutionProvider } from '../../utils/text';
 
+const LOOT_VIEW_X = 88;
+const LOOT_VIEW_Y = 360;
+const LOOT_VIEW_WIDTH = 604;
+const LOOT_VIEW_HEIGHT = 118;
+const LOOT_ITEM_SIZE = 92;
+const LOOT_ITEM_GAP = 9;
+
 type ResultsSceneOptions = {
+  backgroundTexture: Texture;
+  itemTextures: Map<number, Texture>;
   selected: Set<number>;
   textResolution: TextResolutionProvider;
   onBackToTitle: () => void;
@@ -19,16 +26,20 @@ function rankFor(score: number) {
 }
 
 export class ResultsScene extends Container {
+  private readonly backgroundTexture: Texture;
+  private readonly itemTextures: Map<number, Texture>;
   private readonly selected: Set<number>;
   private readonly textResolution: TextResolutionProvider;
   private readonly onBackToTitle: () => void;
 
-  constructor({ selected, textResolution, onBackToTitle }: ResultsSceneOptions) {
+  constructor({ backgroundTexture, itemTextures, selected, textResolution, onBackToTitle }: ResultsSceneOptions) {
     super({
       label: 'results-scene',
       boundsArea: new Rectangle(0, 0, WORLD_WIDTH, WORLD_HEIGHT),
     });
 
+    this.backgroundTexture = backgroundTexture;
+    this.itemTextures = itemTextures;
     this.selected = selected;
     this.textResolution = textResolution;
     this.onBackToTitle = onBackToTitle;
@@ -36,32 +47,115 @@ export class ResultsScene extends Container {
   }
 
   private draw() {
-    drawBackdrop(this);
+    this.drawBackground();
 
     const value = this.totalValue();
     const weight = this.totalWeight();
     const rank = rankFor(value);
 
-    addText(this, '脱出成功', 400, 80, 44, 0xffd56b, 'bold', this.textResolution);
-    addText(this, rank.grade, 400, 165, 82, rank.grade === 'S' ? 0xffde68 : 0x82e2a5, 'bold', this.textResolution);
-    addText(this, rank.label, 400, 220, 24, 0xd7e4df, 'normal', this.textResolution);
-    addText(this, `スコア ${money.format(value)}`, 400, 275, 34, 0x82e2a5, 'bold', this.textResolution);
-    addText(this, `重量 ${weight.toFixed(1)} kg / ${CAPACITY.toFixed(1)} kg`, 400, 314, 22, 0xd7e4df, 'normal', this.textResolution);
-    this.drawLootList();
-    makeButton(this, 'タイトルへ戻る', 400, 535, 210, 50, this.onBackToTitle, this.textResolution, 0x365d62);
+    addText(this, money.format(value), 307, 164, 42, 0xffd33f, 'bold', this.textResolution);
+    addText(this, `${weight.toFixed(1)} kg / ${CAPACITY.toFixed(1)} kg`, 236, 272, 30, 0xfff1cf, 'bold', this.textResolution);
+    addText(this, rank.grade, 585, 172, 98, rank.grade === 'S' ? 0xffd33f : 0x82e2a5, 'bold', this.textResolution);
+    addText(this, rank.label, 585, 255, 24, 0xfff1cf, 'bold', this.textResolution);
+    this.drawLootStrip();
+    this.drawBackButtonHitArea();
   }
 
-  private drawLootList() {
+  private drawBackground() {
+    const background = new Sprite(this.backgroundTexture);
+    background.width = WORLD_WIDTH;
+    background.height = WORLD_HEIGHT;
+    this.addChild(background);
+  }
+
+  private drawLootStrip() {
     const loot = this.selectedItems();
-    const list = loot.length ? loot.map((item) => `${item.name}  ${money.format(item.value)}`).join('\n') : '盗み出した宝はありません';
-    const lootText = new Text({
-      text: list,
-      resolution: this.textResolution(),
-      style: { fontFamily: 'Inter, Segoe UI, Arial, sans-serif', fontSize: 17, fill: 0xd7e4df, align: 'center', lineHeight: 24 },
+    if (!loot.length) {
+      addText(this, '盗み出したお宝はありません', 400, 410, 24, 0xfff1cf, 'bold', this.textResolution);
+      return;
+    }
+
+    const viewport = new Container({ label: 'results-loot-viewport' });
+    const content = new Container({ label: 'results-loot-scroll-content' });
+    const mask = new Graphics({ label: 'results-loot-mask' });
+    const contentWidth = loot.length * LOOT_ITEM_SIZE + (loot.length - 1) * LOOT_ITEM_GAP;
+    const maxScroll = Math.max(0, contentWidth - LOOT_VIEW_WIDTH);
+
+    viewport.position.set(LOOT_VIEW_X, LOOT_VIEW_Y);
+    viewport.eventMode = 'static';
+    viewport.cursor = maxScroll > 0 ? 'grab' : 'default';
+    viewport.hitArea = new Rectangle(0, 0, LOOT_VIEW_WIDTH, LOOT_VIEW_HEIGHT);
+    mask.rect(LOOT_VIEW_X, LOOT_VIEW_Y, LOOT_VIEW_WIDTH, LOOT_VIEW_HEIGHT).fill(0xffffff);
+    viewport.mask = mask;
+
+    loot.forEach((item, index) => {
+      const texture = this.itemTextures.get(item.id);
+      if (!texture) return;
+
+      const image = new Sprite(texture);
+      const scale = Math.min(LOOT_ITEM_SIZE / texture.width, LOOT_ITEM_SIZE / texture.height);
+      image.anchor.set(0.5);
+      image.position.set(index * (LOOT_ITEM_SIZE + LOOT_ITEM_GAP) + LOOT_ITEM_SIZE / 2, LOOT_VIEW_HEIGHT / 2);
+      image.scale.set(scale);
+      content.addChild(image);
     });
-    lootText.anchor.set(0.5, 0);
-    lootText.position.set(400, 345);
-    this.addChild(lootText);
+
+    let dragging = false;
+    let dragStartX = 0;
+    let contentStartX = 0;
+    const clamp = (value: number) => Math.min(0, Math.max(-maxScroll, value));
+    const setScroll = (value: number) => {
+      content.x = clamp(value);
+    };
+
+    viewport.on('pointerdown', (event) => {
+      if (maxScroll <= 0) return;
+      dragging = true;
+      dragStartX = event.global.x;
+      contentStartX = content.x;
+      viewport.cursor = 'grabbing';
+    });
+    viewport.on('pointermove', (event) => {
+      if (!dragging) return;
+      setScroll(contentStartX + event.global.x - dragStartX);
+    });
+    const stopDragging = () => {
+      dragging = false;
+      viewport.cursor = maxScroll > 0 ? 'grab' : 'default';
+    };
+    viewport.on('pointerup', stopDragging);
+    viewport.on('pointerupoutside', stopDragging);
+    viewport.on('wheel', (event) => {
+      if (maxScroll <= 0) return;
+      setScroll(content.x - event.deltaY - event.deltaX);
+    });
+
+    viewport.addChild(content);
+    this.addChild(mask, viewport);
+  }
+
+  private drawBackButtonHitArea() {
+    const button = new Container({ label: 'results-back-button' });
+    const width = 300;
+    const height = 72;
+    const hoverGlow = new Graphics({ label: 'results-back-hover-glow' });
+
+    button.position.set(400, 546);
+    button.eventMode = 'static';
+    button.cursor = 'pointer';
+    button.hitArea = new Rectangle(-width / 2, -height / 2, width, height);
+    button.on('pointerdown', this.onBackToTitle);
+    button.on('pointerover', () => {
+      hoverGlow.visible = true;
+    });
+    button.on('pointerout', () => {
+      hoverGlow.visible = false;
+    });
+
+    hoverGlow.roundRect(-width / 2, -height / 2, width, height, 8).fill({ color: 0xffffff, alpha: 0.13 });
+    hoverGlow.visible = false;
+    button.addChild(hoverGlow);
+    this.addChild(button);
   }
 
   private selectedItems() {
