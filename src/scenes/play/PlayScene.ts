@@ -1,0 +1,333 @@
+import { Container, Graphics, Rectangle, Sprite, Text, Texture } from 'pixi.js';
+import { CAPACITY, ROUND_SECONDS, WORLD_HEIGHT, WORLD_WIDTH, items, money } from '../../constants';
+import { drawBackdrop } from '../../utils/backdrop';
+import type { Item } from '../../types';
+import { makeButton } from '../../utils/button';
+import { addText, type TextResolutionProvider } from '../../utils/text';
+import { drawBag } from './drawBag';
+import { drawGauge } from './drawGauge';
+import { drawItemImage } from './drawItemImage';
+
+const ITEM_CARD_WIDTH = 78;
+const ITEM_CARD_HEIGHT = 110;
+const ITEM_CARD_COL_GAP = 78;
+const ITEM_CARD_ROW_GAP = 108;
+
+type GameLayers = {
+  staticLayer: Container;
+  itemLayer: Container;
+  statusLayer: Container;
+  overlayLayer: Container;
+};
+
+type PlaySceneOptions = {
+  backgroundTexture: Texture;
+  itemTextures: Map<number, Texture>;
+  textResolution: TextResolutionProvider;
+  onFinish: (selected: Set<number>) => void;
+};
+
+export class PlayScene extends Container {
+  private readonly backgroundTexture: Texture;
+  private readonly itemTextures: Map<number, Texture>;
+  private readonly textResolution: TextResolutionProvider;
+  private readonly onFinish: (selected: Set<number>) => void;
+  private readonly layers: GameLayers;
+  private selected = new Set<number>();
+  private timeLeft = ROUND_SECONDS;
+  private lastTick = performance.now();
+  private hoveredItem: Item | null = null;
+  private message = '';
+  private messageUntil = 0;
+  private timerText: Text | null = null;
+
+  constructor({ backgroundTexture, itemTextures, textResolution, onFinish }: PlaySceneOptions) {
+    super({
+      label: 'play-scene',
+      boundsArea: new Rectangle(0, 0, WORLD_WIDTH, WORLD_HEIGHT),
+    });
+
+    this.backgroundTexture = backgroundTexture;
+    this.itemTextures = itemTextures;
+    this.textResolution = textResolution;
+    this.onFinish = onFinish;
+    this.layers = this.createLayers();
+    this.addChild(this.layers.staticLayer, this.layers.itemLayer, this.layers.statusLayer, this.layers.overlayLayer);
+    this.drawScene();
+  }
+
+  update(now = performance.now()) {
+    const elapsed = (now - this.lastTick) / 1000;
+    this.lastTick = now;
+    this.timeLeft = Math.max(0, this.timeLeft - elapsed);
+
+    if (this.timeLeft <= 0) {
+      this.finish();
+      return;
+    }
+
+    this.updateTimer();
+    this.clearExpiredToast(now);
+  }
+
+  private createLayers(): GameLayers {
+    return {
+      staticLayer: this.createLayer('play-static-layer'),
+      itemLayer: this.createLayer('play-item-layer'),
+      statusLayer: this.createLayer('play-status-layer'),
+      overlayLayer: this.createLayer('play-overlay-layer'),
+    };
+  }
+
+  private createLayer(label: string) {
+    return new Container({
+      label,
+      boundsArea: new Rectangle(0, 0, WORLD_WIDTH, WORLD_HEIGHT),
+    });
+  }
+
+  private drawScene() {
+    this.drawBackground();
+    this.drawHeader();
+    this.drawItemGrid();
+    this.redrawStatusPanel();
+    this.redrawOverlayLayer();
+  }
+
+  private drawBackground() {
+    if (this.backgroundTexture) {
+      const background = new Sprite(this.backgroundTexture);
+      background.width = WORLD_WIDTH;
+      background.height = WORLD_HEIGHT;
+      this.layers.staticLayer.addChild(background);
+      return;
+    }
+
+    drawBackdrop(this.layers.staticLayer);
+  }
+
+  private drawHeader() {
+    addText(this.layers.staticLayer, '宝物庫', 273, 68, 30, 0xffd56b, 'bold', this.textResolution);
+    this.timerText = addText(
+      this.layers.staticLayer,
+      this.timerLabel(),
+      650,
+      70,
+      32,
+      this.timerColor(),
+      'bold',
+      this.textResolution,
+    );
+  }
+
+  private updateTimer() {
+    if (!this.timerText) return;
+
+    const text = this.timerLabel();
+    if (this.timerText.text !== text) {
+      this.timerText.text = text;
+    }
+    this.timerText.style.fill = this.timerColor();
+  }
+
+  private timerLabel() {
+    return `残り ${Math.ceil(this.timeLeft)}秒`;
+  }
+
+  private timerColor() {
+    return this.timeLeft <= 10 ? 0xff746b : 0xffd56b;
+  }
+
+  private drawItemGrid() {
+    this.layers.itemLayer.removeChildren();
+    items.forEach((item, index) => this.drawItemCard(item, index));
+  }
+
+  private drawItemCard(item: Item, index: number) {
+    const { x, y } = this.itemCardPosition(index);
+    const active = this.selected.has(item.id);
+    const card = new Container({ label: `item-card-${item.id}` });
+
+    card.position.set(x, y);
+    card.eventMode = 'static';
+    card.cursor = 'pointer';
+    card.hitArea = new Rectangle(-ITEM_CARD_WIDTH / 2, -ITEM_CARD_HEIGHT / 2, ITEM_CARD_WIDTH, ITEM_CARD_HEIGHT);
+    drawItemImage(card, item, this.itemTextures, 0, 0, ITEM_CARD_WIDTH, ITEM_CARD_HEIGHT);
+
+    if (active) {
+      card.addChild(this.createItemActiveOutline(), this.createItemCheckMark());
+    }
+
+    card.on('pointerover', () => this.setHoveredItem(item));
+    card.on('pointerout', () => this.setHoveredItem(null));
+    card.on('pointerdown', () => this.toggleItem(item));
+    this.layers.itemLayer.addChild(card);
+  }
+
+  private itemCardPosition(index: number) {
+    const col = index % 5;
+    const row = Math.floor(index / 5);
+
+    return {
+      x: 75 + col * ITEM_CARD_COL_GAP,
+      y: 153 + row * ITEM_CARD_ROW_GAP,
+    };
+  }
+
+  private createItemActiveOutline() {
+    return new Graphics({ label: 'item-active-outline' })
+      .roundRect(-ITEM_CARD_WIDTH / 2, -ITEM_CARD_HEIGHT / 2, ITEM_CARD_WIDTH, ITEM_CARD_HEIGHT, 3)
+      .stroke({ color: 0x67d19b, width: 2 });
+  }
+
+  private createItemCheckMark() {
+    const check = new Graphics({ label: 'item-check-mark' });
+    const checkX = ITEM_CARD_WIDTH / 2 - 8;
+    const checkY = -ITEM_CARD_HEIGHT / 2 + 8;
+
+    check.circle(checkX, checkY, 9).fill(0x67d19b);
+    check
+      .moveTo(checkX - 5, checkY)
+      .lineTo(checkX - 1, checkY + 4)
+      .lineTo(checkX + 6, checkY - 5)
+      .stroke({ color: 0x102015, width: 2.5 });
+
+    return check;
+  }
+
+  private setHoveredItem(item: Item | null) {
+    this.hoveredItem = item;
+    this.redrawStatusPanel();
+    this.redrawOverlayLayer();
+  }
+
+  private redrawStatusPanel() {
+    this.layers.statusLayer.removeChildren();
+    this.drawStatusPanel();
+  }
+
+  private drawStatusPanel() {
+    const panel = new Graphics({ label: 'status-panel' });
+    panel.roundRect(542, 104, 226, 388, 6).fill(0x20282a);
+    panel.roundRect(542, 104, 226, 388, 6).stroke({ color: 0x486065, width: 2 });
+    this.layers.statusLayer.addChild(panel);
+
+    addText(this.layers.statusLayer, 'バッグ', 655, 132, 26, 0xffd56b, 'bold', this.textResolution);
+    drawBag(this.layers.statusLayer, 655, 218, 1.35);
+
+    const weight = this.totalWeight();
+    addText(
+      this.layers.statusLayer,
+      `${weight.toFixed(1)} kg / ${CAPACITY.toFixed(1)} kg`,
+      655,
+      304,
+      20,
+      weight > 47 ? 0xffd56b : 0xd7e4df,
+      'bold',
+      this.textResolution,
+    );
+    drawGauge(this.layers.statusLayer, 570, 326, 170, 18, weight / CAPACITY);
+    addText(this.layers.statusLayer, money.format(this.totalValue()), 655, 377, 34, 0x82e2a5, 'bold', this.textResolution);
+    this.drawStatusHint();
+    makeButton(this.layers.statusLayer, '脱出する', 655, 465, 150, 44, () => this.finish(), this.textResolution, 0xb93431);
+  }
+
+  private drawStatusHint() {
+    const hint = new Text({
+      text: this.statusHintText(),
+      resolution: this.textResolution(),
+      style: { fontFamily: 'Inter, Segoe UI, Arial, sans-serif', fontSize: 16, fill: 0xc9d8d4, align: 'center', lineHeight: 22 },
+    });
+    hint.anchor.set(0.5);
+    hint.position.set(655, 421);
+    this.layers.statusLayer.addChild(hint);
+  }
+
+  private statusHintText() {
+    if (this.hoveredItem) {
+      return `${this.hoveredItem.name}\n${this.hoveredItem.weight.toFixed(1)} kg  ${money.format(this.hoveredItem.value)}`;
+    }
+
+    if (this.selected.size > 0) {
+      return `${this.selected.size}個の宝を収納中`;
+    }
+
+    return '宝にカーソルを合わせてください';
+  }
+
+  private redrawOverlayLayer() {
+    this.layers.overlayLayer.removeChildren();
+    this.drawToast();
+    this.drawHoveredItemFrame();
+  }
+
+  private drawToast() {
+    if (!this.message || performance.now() >= this.messageUntil) return;
+
+    const toast = new Graphics({ label: 'toast' });
+    toast.roundRect(250, 512, 300, 38, 7).fill({ color: 0x681f28, alpha: 0.94 });
+    this.layers.overlayLayer.addChild(toast);
+    addText(this.layers.overlayLayer, this.message, 400, 531, 17, 0xffffff, 'bold', this.textResolution);
+  }
+
+  private drawHoveredItemFrame() {
+    if (!this.hoveredItem) return;
+
+    const index = items.findIndex((item) => item.id === this.hoveredItem?.id);
+    if (index < 0) return;
+
+    const { x, y } = this.itemCardPosition(index);
+    const frame = new Graphics({ label: 'hovered-item-frame' });
+    frame
+      .roundRect(x - ITEM_CARD_WIDTH / 2, y - ITEM_CARD_HEIGHT / 2, ITEM_CARD_WIDTH, ITEM_CARD_HEIGHT, 3)
+      .stroke({ color: 0xffe08a, width: 3 });
+    this.layers.overlayLayer.addChild(frame);
+  }
+
+  private toggleItem(item: Item) {
+    if (this.selected.has(item.id)) {
+      this.selected.delete(item.id);
+      this.redrawSelectionState();
+      return;
+    }
+
+    if (this.totalWeight() + item.weight > CAPACITY) {
+      this.message = 'バッグの容量を超えています！';
+      this.messageUntil = performance.now() + 1200;
+      this.redrawOverlayLayer();
+      return;
+    }
+
+    this.selected.add(item.id);
+    this.redrawSelectionState();
+  }
+
+  private redrawSelectionState() {
+    this.drawItemGrid();
+    this.redrawStatusPanel();
+    this.redrawOverlayLayer();
+  }
+
+  private clearExpiredToast(now = performance.now()) {
+    if (!this.message || now < this.messageUntil) return;
+
+    this.message = '';
+    this.redrawOverlayLayer();
+  }
+
+  private selectedItems() {
+    return items.filter((item) => this.selected.has(item.id));
+  }
+
+  private totalWeight() {
+    return this.selectedItems().reduce((sum, item) => sum + item.weight, 0);
+  }
+
+  private totalValue() {
+    return this.selectedItems().reduce((sum, item) => sum + item.value, 0);
+  }
+
+  private finish() {
+    this.onFinish(new Set(this.selected));
+  }
+}

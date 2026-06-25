@@ -1,7 +1,30 @@
-import { Container, Graphics } from 'pixi.js';
-import type { Item } from './types';
+import { Container, Graphics, Sprite, Texture } from 'pixi.js';
+import type { Item } from '../../types';
 
-export function drawIcon(parent: Container, item: Item, x: number, y: number, scale: number) {
+export function drawItemImage(
+  parent: Container,
+  item: Item,
+  itemTextures: Map<number, Texture>,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+) {
+  const texture = itemTextures.get(item.id);
+  if (!texture) {
+    drawIcon(parent, item, x, y, 0.82);
+    return;
+  }
+
+  const image = new Sprite(texture);
+  image.anchor.set(0.5);
+  image.position.set(x, y);
+  image.width = width;
+  image.height = height;
+  parent.addChild(image);
+}
+
+function drawIcon(parent: Container, item: Item, x: number, y: number, scale: number) {
   const g = new Graphics();
   g.position.set(x, y);
   g.scale.set(scale);
@@ -83,17 +106,4 @@ export function drawIcon(parent: Container, item: Item, x: number, y: number, sc
       g.moveTo(0, 1).lineTo(0, -10).moveTo(0, 1).lineTo(9, 6).stroke({ color: 0x3d2b15, width: 3 });
       break;
   }
-}
-
-export function drawBag(parent: Container, x: number, y: number, scale: number) {
-  const bag = new Graphics();
-  bag.position.set(x, y);
-  bag.scale.set(scale);
-  bag.roundRect(-36, -24, 72, 62, 16).fill(0x5d3b27);
-  bag.ellipse(0, -28, 23, 11).fill(0x2d1c14);
-  bag.rect(-24, -33, 48, 8).fill(0xb88c4f);
-  bag.circle(-15, -4, 5).fill(0xe0b849);
-  bag.circle(4, 5, 5).fill(0xe0b849);
-  bag.circle(18, -2, 5).fill(0xe0b849);
-  parent.addChild(bag);
 }
