@@ -1,10 +1,9 @@
-import { Container, Graphics, Rectangle, Sprite, Text, Texture } from 'pixi.js';
+﻿import { Container, Graphics, Rectangle, Sprite, Text, Texture } from 'pixi.js';
 import { CAPACITY, ROUND_SECONDS, WORLD_HEIGHT, WORLD_WIDTH, items, money } from '../../constants';
 import { drawBackdrop } from '../../utils/backdrop';
 import type { Item } from '../../types';
 import { makeButton } from '../../utils/button';
 import { addText, type TextResolutionProvider } from '../../utils/text';
-import { drawBag } from './drawBag';
 import { drawGauge } from './drawGauge';
 import { drawItemImage } from './drawItemImage';
 
@@ -12,6 +11,12 @@ const ITEM_CARD_WIDTH = 78;
 const ITEM_CARD_HEIGHT = 110;
 const ITEM_CARD_COL_GAP = 78;
 const ITEM_CARD_ROW_GAP = 108;
+const STATUS_PANEL_FRAME = new Rectangle(220, 40, 1000, 1010);
+const STATUS_PANEL_X = 500;
+const STATUS_PANEL_Y = 64;
+const STATUS_PANEL_WIDTH = 286;
+const STATUS_PANEL_SCALE = STATUS_PANEL_WIDTH / STATUS_PANEL_FRAME.width;
+const STATUS_CENTER_X = STATUS_PANEL_X + STATUS_PANEL_WIDTH / 2;
 
 type GameLayers = {
   staticLayer: Container;
@@ -22,6 +27,7 @@ type GameLayers = {
 
 type PlaySceneOptions = {
   backgroundTexture: Texture;
+  uiPanelStackTexture: Texture;
   itemTextures: Map<number, Texture>;
   textResolution: TextResolutionProvider;
   onFinish: (selected: Set<number>) => void;
@@ -29,6 +35,7 @@ type PlaySceneOptions = {
 
 export class PlayScene extends Container {
   private readonly backgroundTexture: Texture;
+  private readonly uiPanelStackTexture: Texture;
   private readonly itemTextures: Map<number, Texture>;
   private readonly textResolution: TextResolutionProvider;
   private readonly onFinish: (selected: Set<number>) => void;
@@ -41,13 +48,14 @@ export class PlayScene extends Container {
   private messageUntil = 0;
   private timerText: Text | null = null;
 
-  constructor({ backgroundTexture, itemTextures, textResolution, onFinish }: PlaySceneOptions) {
+  constructor({ backgroundTexture, uiPanelStackTexture, itemTextures, textResolution, onFinish }: PlaySceneOptions) {
     super({
       label: 'play-scene',
       boundsArea: new Rectangle(0, 0, WORLD_WIDTH, WORLD_HEIGHT),
     });
 
     this.backgroundTexture = backgroundTexture;
+    this.uiPanelStackTexture = uiPanelStackTexture;
     this.itemTextures = itemTextures;
     this.textResolution = textResolution;
     this.onFinish = onFinish;
@@ -108,16 +116,6 @@ export class PlayScene extends Container {
 
   private drawHeader() {
     addText(this.layers.staticLayer, '宝物庫', 273, 68, 30, 0xffd56b, 'bold', this.textResolution);
-    this.timerText = addText(
-      this.layers.staticLayer,
-      this.timerLabel(),
-      650,
-      70,
-      32,
-      this.timerColor(),
-      'bold',
-      this.textResolution,
-    );
   }
 
   private updateTimer() {
@@ -207,53 +205,42 @@ export class PlayScene extends Container {
   }
 
   private drawStatusPanel() {
-    const panel = new Graphics({ label: 'status-panel' });
-    panel.roundRect(542, 104, 226, 388, 6).fill(0x20282a);
-    panel.roundRect(542, 104, 226, 388, 6).stroke({ color: 0x486065, width: 2 });
+    const panelTexture = new Texture({
+      source: this.uiPanelStackTexture.source,
+      frame: STATUS_PANEL_FRAME,
+    });
+    const panel = new Sprite(panelTexture);
+    panel.position.set(STATUS_PANEL_X, STATUS_PANEL_Y);
+    panel.scale.set(STATUS_PANEL_SCALE);
     this.layers.statusLayer.addChild(panel);
 
-    addText(this.layers.statusLayer, 'バッグ', 655, 132, 26, 0xffd56b, 'bold', this.textResolution);
-    drawBag(this.layers.statusLayer, 655, 218, 1.35);
+    this.timerText = addText(
+      this.layers.statusLayer,
+      this.timerLabel(),
+      STATUS_CENTER_X,
+      116,
+      27,
+      this.timerColor(),
+      'bold',
+      this.textResolution,
+    );
 
     const weight = this.totalWeight();
     addText(
       this.layers.statusLayer,
       `${weight.toFixed(1)} kg / ${CAPACITY.toFixed(1)} kg`,
-      655,
-      304,
+      STATUS_CENTER_X,
+      213,
       20,
       weight > 47 ? 0xffd56b : 0xd7e4df,
       'bold',
       this.textResolution,
     );
-    drawGauge(this.layers.statusLayer, 570, 326, 170, 18, weight / CAPACITY);
-    addText(this.layers.statusLayer, money.format(this.totalValue()), 655, 377, 34, 0x82e2a5, 'bold', this.textResolution);
-    this.drawStatusHint();
-    makeButton(this.layers.statusLayer, '脱出する', 655, 465, 150, 44, () => this.finish(), this.textResolution, 0xb93431);
+    drawGauge(this.layers.statusLayer, 558, 235, 170, 18, weight / CAPACITY);
+    addText(this.layers.statusLayer, money.format(this.totalValue()), STATUS_CENTER_X, 331, 31, 0x82e2a5, 'bold', this.textResolution);
+    makeButton(this.layers.statusLayer, '脱出する', STATUS_CENTER_X, 455, 150, 44, () => this.finish(), this.textResolution, 0xb93431);
   }
 
-  private drawStatusHint() {
-    const hint = new Text({
-      text: this.statusHintText(),
-      resolution: this.textResolution(),
-      style: { fontFamily: 'Inter, Segoe UI, Arial, sans-serif', fontSize: 16, fill: 0xc9d8d4, align: 'center', lineHeight: 22 },
-    });
-    hint.anchor.set(0.5);
-    hint.position.set(655, 421);
-    this.layers.statusLayer.addChild(hint);
-  }
-
-  private statusHintText() {
-    if (this.hoveredItem) {
-      return `${this.hoveredItem.name}\n${this.hoveredItem.weight.toFixed(1)} kg  ${money.format(this.hoveredItem.value)}`;
-    }
-
-    if (this.selected.size > 0) {
-      return `${this.selected.size}個の宝を収納中`;
-    }
-
-    return '宝にカーソルを合わせてください';
-  }
 
   private redrawOverlayLayer() {
     this.layers.overlayLayer.removeChildren();
@@ -292,7 +279,7 @@ export class PlayScene extends Container {
     }
 
     if (this.totalWeight() + item.weight > CAPACITY) {
-      this.message = 'バッグの容量を超えています！';
+      this.message = 'バッグの容量を超えています';
       this.messageUntil = performance.now() + 1200;
       this.redrawOverlayLayer();
       return;
