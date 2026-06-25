@@ -1,8 +1,8 @@
 import { Container, Graphics } from 'pixi.js';
-import { WORLD_HEIGHT, WORLD_WIDTH } from './constants';
+import { WORLD_HEIGHT, WORLD_WIDTH } from '../constants';
 
 export function drawBackdrop(parent: Container) {
-  // 背景画像がない場面や結果画面用に、画面全体の下地と上下の帯を描画する。
+  // Draw the base and top/bottom bands for scenes without a background image.
   const bg = new Graphics({ label: 'backdrop' });
   bg.rect(0, 0, WORLD_WIDTH, WORLD_HEIGHT).fill(0x111719);
   bg.rect(0, 0, WORLD_WIDTH, 88).fill(0x1e2d2d);

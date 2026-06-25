@@ -1,6 +1,6 @@
 import { BlurFilter, Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js';
 import { WORLD_HEIGHT, WORLD_WIDTH } from '../../constants';
-import { drawBackdrop } from '../../backdrop';
+import { drawBackdrop } from '../../utils/backdrop';
 
 const SPARKLE_COUNT = 12;
 const SPARKLE_AREA = new Rectangle(520, 380, 260, 190);

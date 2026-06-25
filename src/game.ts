@@ -1,7 +1,7 @@
 import { Application, Container, Rectangle } from 'pixi.js';
 import { WORLD_HEIGHT, WORLD_WIDTH } from './constants';
 import { loadGameAssets, type GameAssets } from './gameAssets';
-import { drawBackdrop } from './backdrop';
+import { drawBackdrop } from './utils/backdrop';
 import { PlayScene } from './scenes/play/PlayScene';
 import { ResultsScene } from './scenes/results/ResultsScene';
 import { TitleScene } from './scenes/title/TitleScene';

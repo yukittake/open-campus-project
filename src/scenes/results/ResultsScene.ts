@@ -1,8 +1,8 @@
 import { Container, Rectangle, Text } from 'pixi.js';
 import { CAPACITY, WORLD_HEIGHT, WORLD_WIDTH, items, money } from '../../constants';
-import { drawBackdrop } from '../../backdrop';
-import { makeButton } from '../../button';
-import { addText, type TextResolutionProvider } from '../../text';
+import { drawBackdrop } from '../../utils/backdrop';
+import { makeButton } from '../../utils/button';
+import { addText, type TextResolutionProvider } from '../../utils/text';
 
 type ResultsSceneOptions = {
   selected: Set<number>;

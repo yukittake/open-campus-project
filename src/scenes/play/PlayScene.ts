@@ -1,9 +1,9 @@
 import { Container, Graphics, Rectangle, Sprite, Text, Texture } from 'pixi.js';
 import { CAPACITY, ROUND_SECONDS, WORLD_HEIGHT, WORLD_WIDTH, items, money } from '../../constants';
-import { drawBackdrop } from '../../backdrop';
+import { drawBackdrop } from '../../utils/backdrop';
 import type { Item } from '../../types';
-import { makeButton } from '../../button';
-import { addText, type TextResolutionProvider } from '../../text';
+import { makeButton } from '../../utils/button';
+import { addText, type TextResolutionProvider } from '../../utils/text';
 import { drawBag } from './drawBag';
 import { drawGauge } from './drawGauge';
 import { drawItemImage } from './drawItemImage';
