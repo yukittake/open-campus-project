@@ -2,7 +2,6 @@
 import { CAPACITY, ROUND_SECONDS, WORLD_HEIGHT, WORLD_WIDTH, items, money } from '../../constants';
 import { drawBackdrop } from '../../utils/backdrop';
 import type { Item } from '../../types';
-import { makeButton } from '../../utils/button';
 import { addText, type TextResolutionProvider } from '../../utils/text';
 import { drawGauge } from './drawGauge';
 import { drawItemImage } from './drawItemImage';
@@ -18,6 +17,7 @@ const STATUS_PANEL_WIDTH = 286;
 const STATUS_PANEL_SCALE = STATUS_PANEL_WIDTH / STATUS_PANEL_FRAME.width;
 const STATUS_CENTER_X = STATUS_PANEL_X + STATUS_PANEL_WIDTH / 2;
 const KNAPSACK_STATUS_WIDTH = 400;
+const RUN_AWAY_BUTTON_WIDTH = 220;
 
 type GameLayers = {
   staticLayer: Container;
@@ -29,6 +29,7 @@ type GameLayers = {
 type PlaySceneOptions = {
   backgroundTexture: Texture;
   knapsackTexture: Texture;
+  runAwayTexture: Texture;
   uiPanelStackTexture: Texture;
   itemTextures: Map<number, Texture>;
   textResolution: TextResolutionProvider;
@@ -38,6 +39,7 @@ type PlaySceneOptions = {
 export class PlayScene extends Container {
   private readonly backgroundTexture: Texture;
   private readonly knapsackTexture: Texture;
+  private readonly runAwayTexture: Texture;
   private readonly uiPanelStackTexture: Texture;
   private readonly itemTextures: Map<number, Texture>;
   private readonly textResolution: TextResolutionProvider;
@@ -51,7 +53,7 @@ export class PlayScene extends Container {
   private messageUntil = 0;
   private timerText: Text | null = null;
 
-  constructor({ backgroundTexture, knapsackTexture, uiPanelStackTexture, itemTextures, textResolution, onFinish }: PlaySceneOptions) {
+  constructor({ backgroundTexture, knapsackTexture, runAwayTexture, uiPanelStackTexture, itemTextures, textResolution, onFinish }: PlaySceneOptions) {
     super({
       label: 'play-scene',
       boundsArea: new Rectangle(0, 0, WORLD_WIDTH, WORLD_HEIGHT),
@@ -59,6 +61,7 @@ export class PlayScene extends Container {
 
     this.backgroundTexture = backgroundTexture;
     this.knapsackTexture = knapsackTexture;
+    this.runAwayTexture = runAwayTexture;
     this.uiPanelStackTexture = uiPanelStackTexture;
     this.itemTextures = itemTextures;
     this.textResolution = textResolution;
@@ -238,7 +241,7 @@ export class PlayScene extends Container {
     drawGauge(this.layers.statusLayer, 558, 235, 170, 18, weight / CAPACITY);
     addText(this.layers.statusLayer, money.format(this.totalValue()), STATUS_CENTER_X, 331, 31, 0x82e2a5, 'bold', this.textResolution);
     this.drawStatusKnapsack();
-    makeButton(this.layers.statusLayer, '脱出する', STATUS_CENTER_X, 528, 150, 44, () => this.finish(), this.textResolution, 0xb93431);
+    this.drawRunAwayButton();
   }
 
   private drawStatusKnapsack() {
@@ -247,6 +250,33 @@ export class PlayScene extends Container {
     knapsack.position.set(STATUS_CENTER_X, 463);
     knapsack.scale.set(KNAPSACK_STATUS_WIDTH / this.knapsackTexture.width);
     this.layers.statusLayer.addChild(knapsack);
+  }
+
+  private drawRunAwayButton() {
+    const button = new Container({ label: 'run-away-button' });
+    const sprite = new Sprite(this.runAwayTexture);
+    const scale = RUN_AWAY_BUTTON_WIDTH / this.runAwayTexture.width;
+    const width = RUN_AWAY_BUTTON_WIDTH;
+    const height = this.runAwayTexture.height * scale;
+    const hoverGlow = new Graphics({ label: 'run-away-hover-glow' });
+
+    button.position.set(STATUS_CENTER_X, 528);
+    button.eventMode = 'static';
+    button.cursor = 'pointer';
+    button.hitArea = new Rectangle(-width / 2, -height / 2, width, height);
+    button.on('pointerdown', () => this.finish());
+    button.on('pointerover', () => {
+      hoverGlow.visible = true;
+    });
+    button.on('pointerout', () => {
+      hoverGlow.visible = false;
+    });
+    sprite.anchor.set(0.5);
+    sprite.scale.set(scale);
+    hoverGlow.rect(-width / 2 + 4, -height / 2 + 4, width - 8, height - 8).fill({ color: 0xffffff, alpha: 0.18 });
+    hoverGlow.visible = false;
+    button.addChild(sprite, hoverGlow);
+    this.layers.statusLayer.addChild(button);
   }
 
   private redrawOverlayLayer() {

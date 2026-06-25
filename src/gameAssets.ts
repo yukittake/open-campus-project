@@ -3,6 +3,7 @@ import type { Item } from './types';
 
 import gameBackgroundUrl from '../images/in-game/background.png';
 import knapsackUrl from '../images/in-game/knapsack.png';
+import runAwayUrl from '../images/in-game/run-away.png';
 import titleImageUrl from '../images/in-game/title_chatgpt.png';
 import uiPanelStackUrl from '../images/in-game/ui-panel-stack.png';
 
@@ -15,21 +16,23 @@ const itemImageUrls = import.meta.glob('../images/in-game/items/item_*.png', {
 export type GameAssets = {
   gameBackgroundTexture: Texture;
   knapsackTexture: Texture;
+  runAwayTexture: Texture;
   titleTexture: Texture;
   uiPanelStackTexture: Texture;
   itemTextures: Map<number, Texture>;
 };
 
 export async function loadGameAssets(): Promise<GameAssets> {
-  const [gameBackgroundTexture, knapsackTexture, titleTexture, uiPanelStackTexture, itemTextures] = await Promise.all([
+  const [gameBackgroundTexture, knapsackTexture, runAwayTexture, titleTexture, uiPanelStackTexture, itemTextures] = await Promise.all([
     Assets.load<Texture>(gameBackgroundUrl),
     Assets.load<Texture>(knapsackUrl),
+    Assets.load<Texture>(runAwayUrl),
     Assets.load<Texture>(titleImageUrl),
     Assets.load<Texture>(uiPanelStackUrl),
     loadItemTextures(),
   ]);
 
-  return { gameBackgroundTexture, knapsackTexture, titleTexture, uiPanelStackTexture, itemTextures };
+  return { gameBackgroundTexture, knapsackTexture, runAwayTexture, titleTexture, uiPanelStackTexture, itemTextures };
 }
 
 async function loadItemTextures() {
