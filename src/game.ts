@@ -83,6 +83,7 @@ export class KnapsackThiefGame {
     this.setScene(
       new PlayScene({
         backgroundTexture: this.assets.gameBackgroundTexture,
+        knapsackTexture: this.assets.knapsackTexture,
         uiPanelStackTexture: this.assets.uiPanelStackTexture,
         itemTextures: this.assets.itemTextures,
         textResolution: () => this.textResolution(),

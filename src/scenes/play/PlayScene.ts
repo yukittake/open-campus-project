@@ -17,6 +17,7 @@ const STATUS_PANEL_Y = 64;
 const STATUS_PANEL_WIDTH = 286;
 const STATUS_PANEL_SCALE = STATUS_PANEL_WIDTH / STATUS_PANEL_FRAME.width;
 const STATUS_CENTER_X = STATUS_PANEL_X + STATUS_PANEL_WIDTH / 2;
+const KNAPSACK_STATUS_WIDTH = 400;
 
 type GameLayers = {
   staticLayer: Container;
@@ -27,6 +28,7 @@ type GameLayers = {
 
 type PlaySceneOptions = {
   backgroundTexture: Texture;
+  knapsackTexture: Texture;
   uiPanelStackTexture: Texture;
   itemTextures: Map<number, Texture>;
   textResolution: TextResolutionProvider;
@@ -35,6 +37,7 @@ type PlaySceneOptions = {
 
 export class PlayScene extends Container {
   private readonly backgroundTexture: Texture;
+  private readonly knapsackTexture: Texture;
   private readonly uiPanelStackTexture: Texture;
   private readonly itemTextures: Map<number, Texture>;
   private readonly textResolution: TextResolutionProvider;
@@ -48,13 +51,14 @@ export class PlayScene extends Container {
   private messageUntil = 0;
   private timerText: Text | null = null;
 
-  constructor({ backgroundTexture, uiPanelStackTexture, itemTextures, textResolution, onFinish }: PlaySceneOptions) {
+  constructor({ backgroundTexture, knapsackTexture, uiPanelStackTexture, itemTextures, textResolution, onFinish }: PlaySceneOptions) {
     super({
       label: 'play-scene',
       boundsArea: new Rectangle(0, 0, WORLD_WIDTH, WORLD_HEIGHT),
     });
 
     this.backgroundTexture = backgroundTexture;
+    this.knapsackTexture = knapsackTexture;
     this.uiPanelStackTexture = uiPanelStackTexture;
     this.itemTextures = itemTextures;
     this.textResolution = textResolution;
@@ -96,7 +100,6 @@ export class PlayScene extends Container {
 
   private drawScene() {
     this.drawBackground();
-    this.drawHeader();
     this.drawItemGrid();
     this.redrawStatusPanel();
     this.redrawOverlayLayer();
@@ -112,10 +115,6 @@ export class PlayScene extends Container {
     }
 
     drawBackdrop(this.layers.staticLayer);
-  }
-
-  private drawHeader() {
-    addText(this.layers.staticLayer, '宝物庫', 273, 68, 30, 0xffd56b, 'bold', this.textResolution);
   }
 
   private updateTimer() {
@@ -238,9 +237,17 @@ export class PlayScene extends Container {
     );
     drawGauge(this.layers.statusLayer, 558, 235, 170, 18, weight / CAPACITY);
     addText(this.layers.statusLayer, money.format(this.totalValue()), STATUS_CENTER_X, 331, 31, 0x82e2a5, 'bold', this.textResolution);
-    makeButton(this.layers.statusLayer, '脱出する', STATUS_CENTER_X, 455, 150, 44, () => this.finish(), this.textResolution, 0xb93431);
+    this.drawStatusKnapsack();
+    makeButton(this.layers.statusLayer, '脱出する', STATUS_CENTER_X, 528, 150, 44, () => this.finish(), this.textResolution, 0xb93431);
   }
 
+  private drawStatusKnapsack() {
+    const knapsack = new Sprite(this.knapsackTexture);
+    knapsack.anchor.set(0.5);
+    knapsack.position.set(STATUS_CENTER_X, 463);
+    knapsack.scale.set(KNAPSACK_STATUS_WIDTH / this.knapsackTexture.width);
+    this.layers.statusLayer.addChild(knapsack);
+  }
 
   private redrawOverlayLayer() {
     this.layers.overlayLayer.removeChildren();
