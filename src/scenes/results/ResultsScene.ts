@@ -18,7 +18,8 @@ type ResultsSceneOptions = {
 };
 
 function rankFor(score: number) {
-  if (score >= 15000) return { grade: 'S', label: '伝説の怪盗' };
+  if (score === 15800) return { grade: 'SS', label: '怪盗の神' };
+  if (score >= 15001) return { grade: 'S', label: '伝説の怪盗'}
   if (score >= 14000) return { grade: 'A', label: '一流の盗み' };
   if (score >= 12000) return { grade: 'B', label: 'なかなかの成果' };
   if (score >= 10000) return { grade: 'C', label: 'まずまずの脱出' };
