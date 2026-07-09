@@ -7,6 +7,10 @@ import { ResultsScene } from './scenes/results/ResultsScene';
 import { TitleScene } from './scenes/title/TitleScene';
 import { sound } from '@pixi/sound';
 
+import titleMusicUrl from '../sounds/title-music.mp3'
+import playMusicUrl  from '../sounds/play-music.mp3'
+import resultsMusicUrl from '../sounds/results-music.mp3'
+
 type GameScene = Container & {
   update?: () => void;
 };
@@ -36,9 +40,9 @@ export class KnapsackThiefGame {
     drawBackdrop(this.world);
     this.assets = await loadGameAssets();
 
-    sound.add('title', "./sounds/title-music.mp3");
-    sound.add('play', "./sounds/play-music.mp3");
-    sound.add('results', "./sounds/results-music.mp3");
+    sound.add('title', titleMusicUrl);
+    sound.add('play', playMusicUrl);
+    sound.add('results', resultsMusicUrl);
 
     sound.play('title');
     window.addEventListener('resize', () => {
