@@ -78,7 +78,9 @@ export class TitleScene extends Container {
     button.eventMode = 'static';
     button.cursor = 'pointer';
     button.hitArea = new Rectangle(-158, -46, 316, 92);
-    button.on('pointerdown', onStart);
+    button.on('pointerdown', () => {
+      onStart();
+    });
     this.addChild(button);
   }
 
