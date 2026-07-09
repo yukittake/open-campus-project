@@ -1,7 +1,6 @@
 import { BlurFilter, Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js';
 import { WORLD_HEIGHT, WORLD_WIDTH } from '../../constants';
 import { drawBackdrop } from '../../utils/backdrop';
-import { AudioManager } from '../../utils/audioManager';
 
 const SPARKLE_COUNT = 12;
 const SPARKLE_AREA = new Rectangle(520, 380, 260, 190);
@@ -80,8 +79,6 @@ export class TitleScene extends Container {
     button.cursor = 'pointer';
     button.hitArea = new Rectangle(-158, -46, 316, 92);
     button.on('pointerdown', () => {
-      // ユーザー操作イベント内で音声を再生（オートプレイ制限を回避）
-      const audioManager = AudioManager.getInstance();
       onStart();
     });
     this.addChild(button);

@@ -5,7 +5,7 @@ import { drawBackdrop } from './utils/backdrop';
 import { PlayScene } from './scenes/play/PlayScene';
 import { ResultsScene } from './scenes/results/ResultsScene';
 import { TitleScene } from './scenes/title/TitleScene';
-import { AudioManager } from './utils/audioManager';
+import { sound } from '@pixi/sound';
 
 type GameScene = Container & {
   update?: () => void;
@@ -17,7 +17,6 @@ export class KnapsackThiefGame {
     label: 'world',
     boundsArea: new Rectangle(0, 0, WORLD_WIDTH, WORLD_HEIGHT),
   });
-  private readonly audioManager = AudioManager.getInstance();
   private currentScene: GameScene | null = null;
   private assets: GameAssets | null = null;
   private currentScale = 1;
@@ -37,11 +36,11 @@ export class KnapsackThiefGame {
     drawBackdrop(this.world);
     this.assets = await loadGameAssets();
 
-    // サウンドをロード（ユーザー操作後に再生します）
-    await this.audioManager.loadSound('title', "./sounds/title-music.mp3");
-    await this.audioManager.loadSound('play', "./sounds/play-music.mp3");
-    await this.audioManager.loadSound('results', "./sounds/results-music.mp3");
+    sound.add('title', "./sounds/title-music.mp3");
+    sound.add('play', "./sounds/play-music.mp3");
+    sound.add('results', "./sounds/results-music.mp3");
 
+    sound.play('title');
     window.addEventListener('resize', () => {
       this.resize();
     });
@@ -49,7 +48,6 @@ export class KnapsackThiefGame {
     this.app.ticker.add(() => this.tick());
     this.resize();
     this.showTitle();
-    this.audioManager.playScene('title');
   }
 
   private resize() {
@@ -77,6 +75,8 @@ export class KnapsackThiefGame {
   private showTitle() {
     if (!this.assets) return;
 
+    sound.stop('results');
+
     this.setScene(
       new TitleScene({
         titleTexture: this.assets.titleTexture,
@@ -84,13 +84,14 @@ export class KnapsackThiefGame {
       }),
     );
 
-    this.audioManager.playScene('title');
+    sound.play('title');
   }
 
   private showPlay() {
     if (!this.assets) return;
 
-    // ゲーム画面に移行してから音声を再生
+    sound.stop('title');
+
     this.setScene(
       new PlayScene({
         backgroundTexture: this.assets.gameBackgroundTexture,
@@ -102,12 +103,14 @@ export class KnapsackThiefGame {
         onFinish: (selected) => this.showResults(selected),
       }),
     );
-    // ユーザー操作後なのでオートプレイ制限の影響を受けない
-    this.audioManager.playScene('play');
+
+    sound.play('play');
   }
 
   private showResults(selected: Set<number>) {
     if (!this.assets) return;
+
+    sound.stop('play');
 
     this.setScene(
       new ResultsScene({
@@ -118,8 +121,8 @@ export class KnapsackThiefGame {
         onBackToTitle: () => this.showTitle(),
       }),
     );
-    // ユーザー操作後なのでオートプレイ制限の影響を受けない
-    this.audioManager.playScene('results');
+    
+    sound.play('results');
   }
 
   private setScene(scene: GameScene) {

@@ -9,13 +9,12 @@
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
-    "pixi-sound": "^3.0.4",
+    "@pixi/sound": "^6.0.1",
     "pixi.js": "^8.9.2"
   },
   "devDependencies": {
     "jimp": "^1.6.1",
     "typescript": "^5.8.3",
-    "vite": "^6.3.5",
-    "wav": "^1.0.2"
+    "vite": "^6.3.5"
   }
 }
