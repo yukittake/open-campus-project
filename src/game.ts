@@ -38,9 +38,9 @@ export class KnapsackThiefGame {
     this.assets = await loadGameAssets();
 
     // サウンドをロード（ユーザー操作後に再生します）
-    await this.audioManager.loadSound('title', import.meta.env.BASE_URL + "sounds/title-music.mp3");
-    await this.audioManager.loadSound('play', import.meta.env.BASE_URL + "sounds/play-music.mp3");
-    await this.audioManager.loadSound('results', import.meta.env.BASE_URL + "sounds/results-music.mp3");
+    await this.audioManager.loadSound('title', "./sounds/title-music.mp3");
+    await this.audioManager.loadSound('play', "./sounds/play-music.mp3");
+    await this.audioManager.loadSound('results', "./sounds/results-music.mp3");
 
     window.addEventListener('resize', () => {
       this.resize();
