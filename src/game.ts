@@ -5,6 +5,11 @@ import { drawBackdrop } from './utils/backdrop';
 import { PlayScene } from './scenes/play/PlayScene';
 import { ResultsScene } from './scenes/results/ResultsScene';
 import { TitleScene } from './scenes/title/TitleScene';
+import { sound } from '@pixi/sound';
+
+import titleMusicUrl from '../sounds/title-music.mp3'
+import playMusicUrl  from '../sounds/play-music.mp3'
+import resultsMusicUrl from '../sounds/results-music.mp3'
 
 type GameScene = Container & {
   update?: () => void;
@@ -35,6 +40,11 @@ export class KnapsackThiefGame {
     drawBackdrop(this.world);
     this.assets = await loadGameAssets();
 
+    sound.add('title', titleMusicUrl);
+    sound.add('play', playMusicUrl);
+    sound.add('results', resultsMusicUrl);
+
+    sound.play('title');
     window.addEventListener('resize', () => {
       this.resize();
     });
@@ -69,16 +79,22 @@ export class KnapsackThiefGame {
   private showTitle() {
     if (!this.assets) return;
 
+    sound.stop('results');
+
     this.setScene(
       new TitleScene({
         titleTexture: this.assets.titleTexture,
         onStart: () => this.showPlay(),
       }),
     );
+
+    sound.play('title');
   }
 
   private showPlay() {
     if (!this.assets) return;
+
+    sound.stop('title');
 
     this.setScene(
       new PlayScene({
@@ -91,10 +107,14 @@ export class KnapsackThiefGame {
         onFinish: (selected) => this.showResults(selected),
       }),
     );
+
+    sound.play('play');
   }
 
   private showResults(selected: Set<number>) {
     if (!this.assets) return;
+
+    sound.stop('play');
 
     this.setScene(
       new ResultsScene({
@@ -105,6 +125,8 @@ export class KnapsackThiefGame {
         onBackToTitle: () => this.showTitle(),
       }),
     );
+    
+    sound.play('results');
   }
 
   private setScene(scene: GameScene) {

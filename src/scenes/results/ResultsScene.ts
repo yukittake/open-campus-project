@@ -16,12 +16,18 @@ type ResultsSceneOptions = {
   onBackToTitle: () => void;
 };
 
+function selectRandomLabel(labels: string[]): string {
+  return labels[Math.floor(Math.random() * labels.length)];
+}
+
 function rankFor(score: number) {
-  if (score >= 15000) return { grade: 'S', label: '伝説の怪盗' };
-  if (score >= 14000) return { grade: 'A', label: '一流の盗み' };
-  if (score >= 12000) return { grade: 'B', label: 'なかなかの成果' };
-  if (score >= 10000) return { grade: 'C', label: 'まずまずの脱出' };
-  return { grade: 'D', label: '次はもっと狙おう' };
+  if (score === 15800) return { grade: 'SS', label: selectRandomLabel(['作者\n『想定してません。』', '開発者\n「もうやめてください。」']) };
+  if (score >= 15001) return { grade: 'S', label: selectRandomLabel(['警備員\n「退職届、書いてきます…。」', 'インターポールが\n本気を出します。']) };
+  if (score >= 14000) return { grade: 'A', label: selectRandomLabel(['警備員\n「あと少しでクビだった…。」', '100%クリア目前。']) };
+  if (score >= 12000) return { grade: 'B', label: selectRandomLabel(['警備員\n「ギリ始末書で済みそうです。」', '欲より理性が\n勝ちました。']) };
+  if (score >= 10000) return { grade: 'C', label: selectRandomLabel(['警備員\n「まだ本気じゃないですよね？」', '盗みに来て\n赤字は新しい。']) };
+  if (score === 0) return { grade: '-', label: selectRandomLabel(['警備員\n「今日も平和でした。」', '下見ですか？']) };
+  return { grade: 'D', label: selectRandomLabel(['帰り道で\nコンビニ寄って帰ろう。', '盗みに来たのにお土産しか\n持って帰ってない。']) };
 }
 
 export class ResultsScene extends Container {
@@ -62,7 +68,7 @@ export class ResultsScene extends Container {
 
     addText(this, money.format(value), 307, 164, 42, 0xffd33f, 'bold', this.textResolution);
     addText(this, `${weight.toFixed(1)} kg / ${CAPACITY.toFixed(1)} kg`, 236, 272, 30, 0xfff1cf, 'bold', this.textResolution);
-    addText(this, rank.grade, 585, 172, 98, rank.grade === 'S' ? 0xffd33f : 0x82e2a5, 'bold', this.textResolution);
+    addText(this, rank.grade, 585, 172, 98, (rank.grade === 'S' || rank.grade === 'SS') ? 0xffd33f : 0x82e2a5, 'bold', this.textResolution);
     addText(this, rank.label, 585, 255, 24, 0xfff1cf, 'bold', this.textResolution);
     this.drawRankingPanel();
     this.drawBackButtonHitArea();
