@@ -44,7 +44,6 @@ export class KnapsackThiefGame {
     sound.add('play', playMusicUrl);
     sound.add('results', resultsMusicUrl);
 
-    sound.play('title');
     window.addEventListener('resize', () => {
       this.resize();
     });
