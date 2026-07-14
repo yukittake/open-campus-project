@@ -211,11 +211,12 @@ export class PlayScene extends Container {
   private drawItemCard(item: Item, index: number) {
     const { x, y } = this.itemCardPosition(index);
     const active = this.selected.has(item.id);
+    const unavailable = this.isItemUnavailable(item);
     const card = new Container({ label: `item-card-${item.id}` });
 
     card.position.set(x, y);
     card.eventMode = 'static';
-    card.cursor = 'pointer';
+    card.cursor = unavailable ? 'not-allowed' : 'pointer';
     card.hitArea = new Rectangle(-ITEM_CARD_WIDTH / 2, -ITEM_CARD_HEIGHT / 2, ITEM_CARD_WIDTH, ITEM_CARD_HEIGHT);
     drawItemImage(card, item, this.itemTextures, 0, 0, ITEM_CARD_WIDTH, ITEM_CARD_HEIGHT);
 
@@ -223,9 +224,15 @@ export class PlayScene extends Container {
       card.addChild(this.createItemActiveOutline(), this.createItemCheckMark());
     }
 
+    if (unavailable) {
+      card.addChild(this.createItemUnavailableOverlay());
+    }
+
     card.on('pointerover', () => this.setHoveredItem(item));
     card.on('pointerout', () => this.setHoveredItem(null));
-    card.on('pointerdown', () => this.toggleItem(item));
+    if (!unavailable) {
+      card.on('pointerdown', () => this.toggleItem(item));
+    }
     this.layers.itemLayer.addChild(card);
   }
 
@@ -258,6 +265,19 @@ export class PlayScene extends Container {
       .stroke({ color: 0x102015, width: 2.5 });
 
     return check;
+  }
+
+  private createItemUnavailableOverlay() {
+    const overlay = new Graphics({ label: 'item-unavailable-overlay' });
+    overlay
+      .roundRect(-ITEM_CARD_WIDTH / 2, -ITEM_CARD_HEIGHT / 2, ITEM_CARD_WIDTH, ITEM_CARD_HEIGHT, 3)
+      .fill({ color: 0x071018, alpha: 0.56 });
+    overlay
+      .moveTo(-ITEM_CARD_WIDTH / 2 + 12, ITEM_CARD_HEIGHT / 2 - 12)
+      .lineTo(ITEM_CARD_WIDTH / 2 - 12, -ITEM_CARD_HEIGHT / 2 + 12)
+      .stroke({ color: 0xffffff, width: 3, alpha: 0.28 });
+
+    return overlay;
   }
 
   private setHoveredItem(item: Item | null) {
@@ -366,10 +386,11 @@ export class PlayScene extends Container {
     if (index < 0) return;
 
     const { x, y } = this.itemCardPosition(index);
+    const unavailable = this.isItemUnavailable(this.hoveredItem);
     const frame = new Graphics({ label: 'hovered-item-frame' });
     frame
       .roundRect(x - ITEM_CARD_WIDTH / 2, y - ITEM_CARD_HEIGHT / 2, ITEM_CARD_WIDTH, ITEM_CARD_HEIGHT, 3)
-      .stroke({ color: 0xffe08a, width: 3 });
+      .stroke({ color: unavailable ? 0x8b98a4 : 0xffe08a, width: 3, alpha: unavailable ? 0.8 : 1 });
     this.layers.overlayLayer.addChild(frame);
   }
 
@@ -396,6 +417,10 @@ export class PlayScene extends Container {
 
     this.selected.add(item.id);
     this.redrawSelectionState();
+  }
+
+  private isItemUnavailable(item: Item) {
+    return !this.selected.has(item.id) && this.totalWeight() + item.weight > CAPACITY;
   }
 
   private redrawSelectionState() {
