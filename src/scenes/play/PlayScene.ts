@@ -10,6 +10,8 @@ const ITEM_CARD_WIDTH = 78;
 const ITEM_CARD_HEIGHT = 110;
 const ITEM_CARD_COL_GAP = 78;
 const ITEM_CARD_ROW_GAP = 108;
+const SORT_BUTTON_WIDTH = 176;
+const SORT_BUTTON_HEIGHT = 29;
 const STATUS_PANEL_FRAME = new Rectangle(220, 40, 1000, 1010);
 const STATUS_PANEL_X = 500;
 const STATUS_PANEL_Y = 64;
@@ -18,6 +20,9 @@ const STATUS_PANEL_SCALE = STATUS_PANEL_WIDTH / STATUS_PANEL_FRAME.width;
 const STATUS_CENTER_X = STATUS_PANEL_X + STATUS_PANEL_WIDTH / 2;
 const KNAPSACK_STATUS_WIDTH = 400;
 const RUN_AWAY_BUTTON_WIDTH = 220;
+
+type SortMode = 'default' | 'value-desc' | 'weight-desc';
+const SORT_MODE_SEQUENCE: SortMode[] = ['default', 'value-desc', 'weight-desc'];
 
 type GameLayers = {
   staticLayer: Container;
@@ -52,6 +57,7 @@ export class PlayScene extends Container {
   private message = '';
   private messageUntil = 0;
   private timerText: Text | null = null;
+  private sortMode: SortMode = 'default';
 
   constructor({ backgroundTexture, knapsackTexture, runAwayTexture, uiPanelStackTexture, itemTextures, textResolution, onFinish }: PlaySceneOptions) {
     super({
@@ -140,7 +146,66 @@ export class PlayScene extends Container {
 
   private drawItemGrid() {
     this.layers.itemLayer.removeChildren();
-    items.forEach((item, index) => this.drawItemCard(item, index));
+    this.drawSortButton();
+    this.displayItems().forEach((item, index) => this.drawItemCard(item, index));
+  }
+
+  private displayItems() {
+    if (this.sortMode === 'value-desc') {
+      return [...items].sort((a, b) => b.value - a.value || a.id - b.id);
+    }
+
+    if (this.sortMode === 'weight-desc') {
+      return [...items].sort((a, b) => b.weight - a.weight || a.id - b.id);
+    }
+
+    return items;
+  }
+
+  private drawSortButton() {
+    const button = new Container({ label: 'sort-mode-button' });
+    const background = new Graphics({ label: 'sort-mode-button-bg' });
+    const label = new Text({
+      text: `並び替え: ${this.sortModeLabel()}`,
+      resolution: this.textResolution(),
+      style: {
+        fontFamily: 'Inter, Segoe UI, Arial, sans-serif',
+        fontSize: 13,
+        fontWeight: 'bold',
+        fill: this.sortMode === 'default' ? 0xffffff : 0x102015,
+      },
+    });
+
+    const drawBackground = (hovered = false) => {
+      background.clear();
+      background
+        .roundRect(-SORT_BUTTON_WIDTH / 2, -SORT_BUTTON_HEIGHT / 2, SORT_BUTTON_WIDTH, SORT_BUTTON_HEIGHT, 6)
+        .fill({
+          color: this.sortMode === 'default' ? (hovered ? 0x314f5a : 0x203740) : hovered ? 0x8beaaf : 0x67d19b,
+          alpha: 0.95,
+        })
+        .stroke({ color: 0xffffff, width: 2, alpha: this.sortMode === 'default' ? 0.18 : 0.3 });
+    };
+
+    button.position.set(330, 72);
+    button.eventMode = 'static';
+    button.cursor = 'pointer';
+    button.hitArea = new Rectangle(-SORT_BUTTON_WIDTH / 2, -SORT_BUTTON_HEIGHT / 2, SORT_BUTTON_WIDTH, SORT_BUTTON_HEIGHT);
+    button.on('pointerover', () => drawBackground(true));
+    button.on('pointerout', () => drawBackground(false));
+    button.on('pointerdown', () => this.advanceSortMode());
+
+    drawBackground(false);
+    label.anchor.set(0.5);
+    button.addChild(background, label);
+    this.layers.itemLayer.addChild(button);
+  }
+
+  private sortModeLabel() {
+    if (this.sortMode === 'value-desc') return '価値順 ↓';
+    if (this.sortMode === 'weight-desc') return '重さ順 ↓';
+
+    return '順番通り';
   }
 
   private drawItemCard(item: Item, index: number) {
@@ -297,7 +362,7 @@ export class PlayScene extends Container {
   private drawHoveredItemFrame() {
     if (!this.hoveredItem) return;
 
-    const index = items.findIndex((item) => item.id === this.hoveredItem?.id);
+    const index = this.displayItems().findIndex((item) => item.id === this.hoveredItem?.id);
     if (index < 0) return;
 
     const { x, y } = this.itemCardPosition(index);
@@ -306,6 +371,13 @@ export class PlayScene extends Container {
       .roundRect(x - ITEM_CARD_WIDTH / 2, y - ITEM_CARD_HEIGHT / 2, ITEM_CARD_WIDTH, ITEM_CARD_HEIGHT, 3)
       .stroke({ color: 0xffe08a, width: 3 });
     this.layers.overlayLayer.addChild(frame);
+  }
+
+  private advanceSortMode() {
+    const index = SORT_MODE_SEQUENCE.indexOf(this.sortMode);
+    this.sortMode = SORT_MODE_SEQUENCE[(index + 1) % SORT_MODE_SEQUENCE.length];
+    this.drawItemGrid();
+    this.redrawOverlayLayer();
   }
 
   private toggleItem(item: Item) {
