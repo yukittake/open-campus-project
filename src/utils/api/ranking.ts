@@ -24,11 +24,24 @@ function throwIfError(error: { message: string } | null) {
   }
 }
 
-export async function submitAndLoadRanking(score: number, totalWeight: number): Promise<RankingResult> {
+export async function loadTenthRankingScore(): Promise<number | null> {
+  const { data, error } = await supabase
+    .from('ranking_entries')
+    .select('score')
+    .order('score', { ascending: false })
+    .order('created_at', { ascending: true })
+    .range(9, 9);
+
+  throwIfError(error);
+
+  return data?.[0]?.score ?? null;
+}
+
+export async function submitAndLoadRanking(score: number, totalWeight: number, playerName: string | null = null): Promise<RankingResult> {
   const { data: current, error: insertError } = await supabase
     .from('ranking_entries')
     .insert({
-      player_name: null,
+      player_name: playerName,
       score,
       total_weight: totalWeight,
     })

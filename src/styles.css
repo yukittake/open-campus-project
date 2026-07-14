@@ -31,6 +31,74 @@ canvas {
   box-shadow: 0 22px 70px rgb(0 0 0 / 42%);
 }
 
+.ranking-name-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(0 0 0 / 58%);
+}
+
+.ranking-name-dialog {
+  width: min(360px, 92vw);
+  padding: 22px;
+  border: 2px solid rgb(255 241 207 / 42%);
+  border-radius: 8px;
+  background: #182623;
+  box-shadow: 0 20px 54px rgb(0 0 0 / 48%);
+  color: #fff1cf;
+}
+
+.ranking-name-title {
+  margin-bottom: 14px;
+  color: #ffd33f;
+  font-size: 24px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.ranking-name-field {
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.ranking-name-input {
+  width: 100%;
+  height: 42px;
+  padding: 0 12px;
+  border: 2px solid rgb(255 241 207 / 36%);
+  border-radius: 6px;
+  outline: none;
+  background: #0f1716;
+  color: #fff;
+  font: 700 18px Inter, "Segoe UI", Arial, sans-serif;
+}
+
+.ranking-name-input:focus {
+  border-color: #82e2a5;
+}
+
+.ranking-name-submit {
+  width: 100%;
+  height: 42px;
+  margin-top: 16px;
+  border: 0;
+  border-radius: 6px;
+  background: #67d19b;
+  color: #102015;
+  cursor: pointer;
+  font: 800 17px Inter, "Segoe UI", Arial, sans-serif;
+}
+
+.ranking-name-submit:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
 .startup-error {
   display: grid;
   place-items: center;
