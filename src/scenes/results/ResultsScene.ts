@@ -62,7 +62,7 @@ export class ResultsScene extends Container {
     addText(this, money.format(value), 307, 164, 42, 0xffd33f, 'bold', this.textResolution);
     addText(this, `${weight.toFixed(1)} kg / ${CAPACITY.toFixed(1)} kg`, 236, 272, 30, 0xfff1cf, 'bold', this.textResolution);
     addText(this, rank.grade, 585, 172, 98, (rank.grade === 'S' || rank.grade === 'SS') ? 0xffd33f : 0x82e2a5, 'bold', this.textResolution);
-    addText(this, rank.label, 585, 255, 24, 0xfff1cf, 'bold', this.textResolution);
+    addText(this, rank.label, 585, 255, 18, 0xfff1cf, 'bold', this.textResolution);
     this.drawLootStrip();
     this.drawBackButtonHitArea();
   }
