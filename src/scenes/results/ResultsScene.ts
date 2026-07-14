@@ -1,6 +1,6 @@
 import { Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js';
 import { CAPACITY, WORLD_HEIGHT, WORLD_WIDTH, items, money } from '../../constants';
-import { submitAndLoadRanking, type RankingEntry, type RankingResult } from '../../utils/api/ranking';
+import { loadTenthRankingScore, submitAndLoadRanking, type RankingEntry, type RankingResult } from '../../utils/api/ranking';
 import { addText, type TextResolutionProvider } from '../../utils/text';
 
 const RANKING_LIST_SIZE = 10;
@@ -38,6 +38,8 @@ export class ResultsScene extends Container {
   private readonly rankingLayer = new Container({ label: 'results-ranking-layer' });
   private rankingResult: RankingResult | null = null;
   private rankingError: string | null = null;
+  private rankingStatusText = 'ランキング確認中...';
+  private nameModalElement: HTMLDivElement | null = null;
   private isDisposed = false;
 
   constructor({ backgroundTexture, selected, textResolution, onBackToTitle }: ResultsSceneOptions) {
@@ -55,6 +57,7 @@ export class ResultsScene extends Container {
 
   override destroy(options?: Parameters<Container['destroy']>[0]) {
     this.isDisposed = true;
+    this.closeNameEntryModal();
     super.destroy(options);
   }
 
@@ -72,7 +75,7 @@ export class ResultsScene extends Container {
     addText(this, rank.label, 585, 255, 18, 0xfff1cf, 'bold', this.textResolution);
     this.drawRankingPanel();
     this.drawBackButtonHitArea();
-    void this.loadRanking(value, weight);
+    void this.prepareRanking(value, weight);
   }
 
   private drawBackground() {
@@ -82,9 +85,34 @@ export class ResultsScene extends Container {
     this.addChild(background);
   }
 
-  private async loadRanking(score: number, totalWeight: number) {
+  private async prepareRanking(score: number, totalWeight: number) {
     try {
-      this.rankingResult = await submitAndLoadRanking(score, totalWeight);
+      const tenthScore = await loadTenthRankingScore();
+      if (this.isDisposed) return;
+
+      if (tenthScore === null || score > tenthScore) {
+        this.rankingStatusText = 'ランキング登録待ち...';
+        this.drawRankingPanel();
+        this.showNameEntryModal(score, totalWeight);
+        return;
+      }
+
+      await this.loadRanking(score, totalWeight);
+    } catch (error) {
+      this.rankingResult = null;
+      this.rankingError = error instanceof Error ? error.message : String(error);
+      if (!this.isDisposed) {
+        this.drawRankingPanel();
+      }
+    }
+  }
+
+  private async loadRanking(score: number, totalWeight: number, playerName: string | null = null) {
+    this.rankingStatusText = 'ランキング送信中...';
+    this.drawRankingPanel();
+
+    try {
+      this.rankingResult = await submitAndLoadRanking(score, totalWeight, playerName);
       this.rankingError = null;
     } catch (error) {
       this.rankingResult = null;
@@ -105,7 +133,7 @@ export class ResultsScene extends Container {
     }
 
     if (!this.rankingResult) {
-      addText(this.rankingLayer, 'ランキング送信中...', 400, 422, 22, 0xfff1cf, 'bold', this.textResolution);
+      addText(this.rankingLayer, this.rankingStatusText, 400, 422, 22, 0xfff1cf, 'bold', this.textResolution);
       return;
     }
 
@@ -249,6 +277,52 @@ export class ResultsScene extends Container {
     hoverGlow.visible = false;
     button.addChild(hoverGlow);
     this.addChild(button);
+  }
+
+  private showNameEntryModal(score: number, totalWeight: number) {
+    this.closeNameEntryModal();
+
+    const modal = document.createElement('div');
+    modal.className = 'ranking-name-modal';
+    modal.innerHTML = `
+      <div class="ranking-name-dialog" role="dialog" aria-modal="true" aria-labelledby="ranking-name-title">
+        <div class="ranking-name-title" id="ranking-name-title">ランキング入り！</div>
+        <label class="ranking-name-field">
+          <span>名前を入力してください</span>
+          <input class="ranking-name-input" type="text" maxlength="24" autocomplete="off" />
+        </label>
+        <button class="ranking-name-submit" type="button">決定</button>
+      </div>
+    `;
+
+    const input = modal.querySelector<HTMLInputElement>('.ranking-name-input');
+    const submit = modal.querySelector<HTMLButtonElement>('.ranking-name-submit');
+    if (!input || !submit) return;
+
+    const submitName = () => {
+      const playerName = input.value.trim() || null;
+      if (submit.disabled) return;
+
+      submit.disabled = true;
+      this.closeNameEntryModal();
+      void this.loadRanking(score, totalWeight, playerName);
+    };
+
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        submitName();
+      }
+    });
+    submit.addEventListener('click', submitName);
+
+    document.body.appendChild(modal);
+    this.nameModalElement = modal;
+    input.focus();
+  }
+
+  private closeNameEntryModal() {
+    this.nameModalElement?.remove();
+    this.nameModalElement = null;
   }
 
   private selectedItems() {
