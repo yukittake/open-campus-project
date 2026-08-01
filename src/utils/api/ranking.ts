@@ -24,10 +24,24 @@ function throwIfError(error: { message: string } | null) {
   }
 }
 
+function getTodayRange(): { start: string; end: string } {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+
+  return {
+    start: start.toISOString(),
+    end: end.toISOString(),
+  };
+}
+
 export async function loadTenthRankingScore(): Promise<number | null> {
+  const today = getTodayRange();
   const { data, error } = await supabase
     .from('ranking_entries')
     .select('score')
+    .gte('created_at', today.start)
+    .lt('created_at', today.end)
     .order('score', { ascending: false })
     .order('created_at', { ascending: true })
     .range(9, 9);
@@ -54,9 +68,12 @@ export async function submitAndLoadRanking(score: number, totalWeight: number, p
     throw new Error('Ranking entry was not returned.');
   }
 
+  const today = getTodayRange();
   const entriesResult = await supabase
     .from('ranking_entries')
     .select('id,player_name,score,total_weight,created_at')
+    .gte('created_at', today.start)
+    .lt('created_at', today.end)
     .order('score', { ascending: false })
     .order('created_at', { ascending: true })
     .limit(10);
