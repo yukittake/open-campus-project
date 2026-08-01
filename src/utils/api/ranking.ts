@@ -43,7 +43,7 @@ export async function loadTenthRankingScore(): Promise<number | null> {
     .gte('created_at', today.start)
     .lt('created_at', today.end)
     .order('score', { ascending: false })
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: false })
     .range(9, 9);
 
   throwIfError(error);
@@ -75,7 +75,7 @@ export async function submitAndLoadRanking(score: number, totalWeight: number, p
     .gte('created_at', today.start)
     .lt('created_at', today.end)
     .order('score', { ascending: false })
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: false })
     .limit(10);
 
   throwIfError(entriesResult.error);
