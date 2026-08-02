@@ -41,7 +41,7 @@
 
 | インデックス | 用途 |
 |---|---|
-| `(score desc, created_at asc)` | 全期間ランキングの上位取得 |
+| `(score desc, created_at desc)` | 全期間ランキングの上位取得。同点では後の投稿を優先 |
 | `(created_at desc)` | 最近の投稿確認、管理画面向け |
 
 #### ランキング順位の考え方
@@ -49,9 +49,9 @@
 基本の並び順:
 
 1. `score desc`
-2. `created_at asc`
+2. `created_at desc`
 
-同点の場合は、先に投稿した結果を上位にする。重量による順位補正は行わない。
+同点の場合は、後に投稿した結果を上位にする。重量による順位補正は行わない。
 
 ## 初期DDL案
 
@@ -72,7 +72,7 @@ create table public.ranking_entries (
 );
 
 create index ranking_entries_score_created_at_idx
-  on public.ranking_entries (score desc, created_at asc);
+  on public.ranking_entries (score desc, created_at desc);
 
 create index ranking_entries_created_at_idx
   on public.ranking_entries (created_at desc);
@@ -91,7 +91,7 @@ select
   total_weight,
   created_at
 from public.ranking_entries
-order by score desc, created_at asc
+order by score desc, created_at desc
 limit 10;
 ```
 
@@ -105,7 +105,7 @@ with ranked as (
     score,
     total_weight,
     created_at,
-    rank() over (order by score desc, created_at asc) as rank
+    rank() over (order by score desc, created_at desc) as rank
   from public.ranking_entries
 )
 select *

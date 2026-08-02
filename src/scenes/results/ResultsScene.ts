@@ -90,7 +90,7 @@ export class ResultsScene extends Container {
       const tenthScore = await loadTenthRankingScore();
       if (this.isDisposed) return;
 
-      if (tenthScore === null || score > tenthScore) {
+      if (tenthScore === null || score >= tenthScore) {
         this.rankingStatusText = 'ランキング登録待ち...';
         this.drawRankingPanel();
         this.showNameEntryModal(score, totalWeight);
